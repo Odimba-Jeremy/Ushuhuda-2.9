@@ -1,0 +1,3599 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Hub — Médecin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="icon" href="logo.jpg">
+
+    <style>
+        /* ==================== CSS COMPLET DU FICHIER styles.css ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0a5c7e;
+            --primary-dark: #084c68;
+            --primary-light: #1e7b9e;
+            --primary-sky: #2c8eb5;
+            --primary-gradient: linear-gradient(135deg, #0a5c7e 0%, #1e7b9e 100%);
+            --secondary: #2c3e50;
+            --accent: #e67e22;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --info: #3498db;
+            --purple: #9b59b6;
+            --dark: #1a2634;
+            --darker: #0f1720;
+            --light: #f8fafc;
+            --gray: #e2e8f0;
+            --gray-light: #f1f5f9;
+            --gray-dark: #64748b;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+            --radius-sm: 8px;
+            --radius: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--gray-light) 0%, #e9ecef 100%);
+            color: var(--dark);
+            min-height: 100vh;
+            padding-left: 300px;
+            overflow-x: hidden;
+        }
+
+        /* ==================== SCROLLBAR ==================== */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--gray); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        /* ==================== TOAST ==================== */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+
+        .toast {
+            background: white;
+            border-radius: var(--radius);
+            padding: 14px 20px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 320px;
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+            border-left: 4px solid;
+            font-weight: 500;
+        }
+
+        .toast.success { border-left-color: var(--success); background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%); }
+        .toast.error { border-left-color: var(--danger); background: linear-gradient(135deg, #fff 0%, #fef2f2 100%); }
+        .toast.warning { border-left-color: var(--warning); background: linear-gradient(135deg, #fff 0%, #fffbeb 100%); }
+        .toast.info { border-left-color: var(--info); background: linear-gradient(135deg, #fff 0%, #eff6ff 100%); }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateX(100%); }
+        }
+
+        /* ==================== LOADING ==================== */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--primary-gradient);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 20000;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            animation: fadeIn 0.6s ease;
+        }
+
+        .loading-logo {
+            width: 120px;
+            height: 120px;
+            border-radius: 28px;
+            object-fit: contain;
+            animation: logoPulse 2s ease-in-out infinite;
+        }
+
+        .loading-pulse {
+            width: 6px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: dotPulse 1.4s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.97); }
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.5); }
+        }
+
+        /* ==================== SIDEBAR ==================== */
+        .sidebar {
+            width: 300px;
+            background: rgba(255, 255, 255, 0.7);
+            border-right: 1px solid rgba(255, 255, 255, 0.85);
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            height: 100vh;
+            overflow-y: auto;
+            transition: var(--transition);
+            box-shadow: var(--shadow-xl);
+            z-index: 100;
+            backdrop-filter: blur(18px);
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(10,92,126,0.3); border-radius: 10px; }
+
+        .sidebar-header {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            padding: 28px 24px 24px;
+            border-bottom: 1px solid rgba(171, 201, 228, 0.3);
+        }
+
+        .sidebar-mark {
+            flex: none;
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(120, 205, 255, 0.95) 0%, rgba(77, 163, 255, 0.95) 100%);
+            color: white;
+            box-shadow: 0 16px 36px rgba(77, 163, 255, 0.2);
+        }
+
+        .sidebar-mark i {
+            font-size: 24px;
+        }
+
+        .sidebar-header h2 {
+            margin: 8px 0 10px;
+            color: var(--darker);
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .sidebar-header p {
+            color: var(--gray-dark);
+            font-size: 12px;
+        }
+
+        .sidebar-logo-img {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            object-fit: cover;
+        }
+
+        .nav-menu { padding: 12px 0; }
+
+        .nav-item {
+            padding: 14px 16px;
+            margin: 5px 14px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #5b7fa3;
+            cursor: pointer;
+            transition: var(--transition);
+            border-radius: var(--radius);
+            border: 1px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: rgba(241, 249, 255, 0.9);
+            border-color: rgba(163, 210, 244, 0.6);
+            color: var(--primary-dark);
+            transform: translateX(0);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(120, 206, 255, 0.98) 0%, rgba(77, 163, 255, 0.98) 100%);
+            color: white;
+            box-shadow: 0 18px 36px rgba(77, 163, 255, 0.24);
+        }
+
+        .nav-item i { width: 22px; font-size: 18px; }
+
+        .nav-section-label {
+            padding: 20px 24px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.4);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-footer {
+            padding: 22px 24px 26px;
+            border-top: 1px solid rgba(171, 201, 228, 0.3);
+        }
+
+        .sidebar-footer-card {
+            margin-bottom: 16px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(242, 248, 255, 0.8);
+            color: var(--dark);
+        }
+
+        .sidebar-footer-card small {
+            display: block;
+            margin-top: 6px;
+            color: var(--gray-dark);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(93, 132, 172, 0.22);
+            backdrop-filter: blur(6px);
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: var(--transition);
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .mobile-menu-btn {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 56px;
+            height: 56px;
+            border: none;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.78);
+            color: var(--primary-dark);
+            box-shadow: var(--shadow-md);
+            z-index: 250;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.82);
+        }
+
+        /* ==================== MAIN CONTENT ==================== */
+        .main-content {
+            flex: 1;
+            margin-left: 300px;
+            padding: 32px;
+            animation: fadeIn 0.4s ease;
+            min-width: 0;
+        }
+
+        /* ==================== PAGE HEADER ==================== */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--darker);
+            letter-spacing: -0.02em;
+        }
+
+        .page-header h1 i {
+            margin-right: 12px;
+            color: var(--primary);
+        }
+
+        .page-header p {
+            color: var(--gray-dark);
+            font-size: 14px;
+        }
+
+        /* ==================== STATS ==================== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.72);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .stat-header i {
+            font-size: 36px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        .stat-label {
+            color: var(--gray-dark);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* ==================== DASHBOARD CARDS ==================== */
+        .dashboard-greeting-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 24px;
+            padding: 26px 30px;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, #0759b8 0%, #0b77d8 100%);
+            color: white;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .dashboard-greeting-card::after {
+            content: "";
+            position: absolute;
+            right: -58px;
+            top: -80px;
+            width: 210px;
+            height: 210px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .dashboard-greeting-copy,
+        .dashboard-time-card {
+            position: relative;
+            z-index: 1;
+        }
+
+        .dashboard-greeting-date {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: capitalize;
+            color: rgba(255, 255, 255, 0.84);
+        }
+
+        .dashboard-greeting-copy h2 {
+            font-size: 30px;
+            line-height: 1.15;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .dashboard-greeting-copy p {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .dashboard-time-card {
+            min-width: 170px;
+            padding: 18px 20px;
+            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            backdrop-filter: blur(8px);
+        }
+
+        .dashboard-time-card span,
+        .dashboard-time-card small {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.74);
+        }
+
+        .dashboard-time-card strong {
+            display: block;
+            margin: 6px 0 2px;
+            font-size: 28px;
+            line-height: 1;
+            color: white;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .dashboard-records-grid {
+            grid-template-columns: minmax(0, 1fr);
+            align-items: start;
+        }
+
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.72);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+
+        .dashboard-card h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .dashboard-card h3 i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+
+        /* ==================== TABLE ==================== */
+        .table-container {
+            background: rgba(255, 255, 255, 0.72);
+            border-radius: 22px;
+            overflow-x: auto;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            padding: 12px;
+            width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray);
+        }
+
+        th {
+            background: var(--gray-light);
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr {
+            transition: var(--transition);
+        }
+
+        tr:hover {
+            background: var(--gray-light);
+        }
+
+        /* ==================== BOUTONS ==================== */
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: 0 16px 36px rgba(77, 163, 255, 0.28);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 40px rgba(66, 145, 232, 0.34);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #219a52 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f28d9a 0%, #e55e6d 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, var(--info) 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning) 0%, #e67e22 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--gray);
+            color: var(--dark);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-sm {
+            padding: 6px 16px;
+            font-size: 12px;
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ==================== BADGE ==================== */
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+        }
+
+        .badge-success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+
+        .badge-danger {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+        }
+
+        .badge-warning {
+            background: linear-gradient(135deg, #fed7aa 0%, #fde68a 100%);
+            color: #92400e;
+        }
+
+        .badge-info {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+        }
+
+        .badge-primary {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            color: #0369a1;
+        }
+
+        .badge-purple {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+            color: #5b21b6;
+        }
+
+        /* ==================== FORM ==================== */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid rgba(173, 204, 232, 0.7);
+            border-radius: var(--radius);
+            font-size: 14px;
+            transition: var(--transition);
+            font-family: inherit;
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--dark);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: rgba(77, 163, 255, 0.9);
+            box-shadow: 0 0 0 5px rgba(77, 163, 255, 0.12);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        select.form-control {
+            appearance: auto;
+        }
+
+        /* ==================== SEARCH BAR ==================== */
+        .search-bar {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            position: relative;
+            align-items: center;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 12px 20px;
+            padding-left: 45px;
+            border: 2px solid rgba(173, 204, 232, 0.7);
+            border-radius: var(--radius);
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--dark);
+            box-shadow: 0 10px 24px rgba(88, 143, 208, 0.08);
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: rgba(77, 163, 255, 0.9);
+            box-shadow: 0 0 0 5px rgba(77, 163, 255, 0.12);
+        }
+
+        .search-bar i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-dark);
+        }
+
+        /* ==================== FILTERS ROW ==================== */
+        .filters-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .filters-row .form-control {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        /* ==================== EMPTY STATE ==================== */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray-dark);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            color: var(--gray);
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .empty-state h3 {
+            color: var(--dark);
+            margin-bottom: 6px;
+        }
+
+        .empty-state p {
+            color: var(--gray-dark);
+        }
+
+        /* ==================== MODAL ==================== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(171, 209, 242, 0.28);
+            backdrop-filter: blur(4px);
+            z-index: 15000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 28px;
+            width: min(100%, 760px);
+            max-height: min(92vh, 860px);
+            overflow-y: auto;
+            padding: 32px;
+            animation: slideUp 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            box-shadow: var(--shadow-lg);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h3 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--darker);
+        }
+
+        .modal-header h3 i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+
+        .close-modal {
+            cursor: pointer;
+            font-size: 28px;
+            color: var(--gray-dark);
+            transition: var(--transition);
+        }
+
+        .close-modal:hover {
+            color: var(--danger);
+            transform: rotate(90deg);
+        }
+
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* ==================== INSIGHT STRIP ==================== */
+        .insight-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .insight-card {
+            padding: 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid rgba(10, 92, 126, 0.12);
+            box-shadow: var(--shadow-md);
+        }
+
+        .insight-card .label {
+            font-size: 12px;
+            color: var(--gray-dark);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .insight-card .value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* ==================== ACTION STACK ==================== */
+        .action-stack {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ==================== LOADING SPINNER ==================== */
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--gray-dark);
+        }
+
+        .loading-spinner::after {
+            content: '';
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--gray);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 1024px) {
+            body {
+                padding-left: 0;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+                width: min(86vw, 320px);
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+
+            .mobile-menu-btn {
+                display: flex;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-records-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: stretch;
+            }
+
+            .dashboard-greeting-card {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 22px;
+            }
+
+            .dashboard-greeting-copy h2 {
+                font-size: 24px;
+            }
+
+            .dashboard-time-card {
+                min-width: 0;
+            }
+
+            .modal-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .data-table {
+                min-width: 640px;
+            }
+
+            .table-container {
+                overflow-x: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content {
+                padding: 16px;
+            }
+
+            .toast {
+                min-width: 0;
+                width: calc(100vw - 32px);
+            }
+
+            .modal-content {
+                padding: 20px;
+                margin: 16px;
+                max-height: 95vh;
+            }
+
+            .data-table {
+                min-width: 560px;
+            }
+
+            .page-header h1 {
+                font-size: 22px;
+            }
+
+            .dashboard-greeting-card {
+                padding: 18px;
+            }
+
+            .dashboard-greeting-copy h2 {
+                font-size: 20px;
+            }
+
+            .stat-value {
+                font-size: 28px;
+            }
+
+            .modal {
+                padding: 12px;
+            }
+
+            .filters-row {
+                flex-direction: column;
+            }
+
+            .filters-row .form-control {
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 12px;
+            }
+
+            .page-header h1 {
+                font-size: 18px;
+            }
+
+            .stat-card {
+                padding: 16px;
+            }
+
+            .dashboard-card {
+                padding: 16px;
+            }
+
+            .modal-content {
+                padding: 16px;
+            }
+
+            .action-stack {
+                gap: 4px;
+            }
+
+            .btn {
+                padding: 8px 14px;
+                font-size: 12px;
+            }
+
+            .btn-sm {
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+
+            .badge {
+                font-size: 10px;
+                padding: 2px 8px;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 10px 8px;
+                font-size: 12px;
+            }
+        }
+
+        /* ==================== PRINT ==================== */
+        @media print {
+            .sidebar,
+            .mobile-menu-btn,
+            .sidebar-overlay {
+                display: none !important;
+            }
+
+            body {
+                padding: 0 !important;
+                background: #fff;
+            }
+
+            .main-content {
+                margin: 0 !important;
+                padding: 20px !important;
+                max-width: 100% !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .page-header {
+                margin-bottom: 16px;
+            }
+
+            .stat-card,
+            .dashboard-card,
+            .table-container {
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+            }
+
+            .dashboard-greeting-card {
+                background: #f8fafc !important;
+                color: var(--dark) !important;
+            }
+
+            .dashboard-greeting-card h2,
+            .dashboard-greeting-card strong {
+                color: var(--dark) !important;
+            }
+        }
+
+        /* ==================== AI GRID ==================== */
+        .ai-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .ai-panel,
+        .ai-result {
+            background: #fff;
+            border: 1px solid var(--gray);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .ai-result pre {
+            white-space: pre-wrap;
+            font-family: inherit;
+            line-height: 1.6;
+            color: var(--dark);
+        }
+
+        .ai-disclaimer {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-left: 4px solid var(--warning);
+            background: #fffbeb;
+            color: #92400e;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        /* ==================== PHARMACY LAYOUT ==================== */
+        .pharmacy-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .pharmacy-cart {
+            position: sticky;
+            top: 18px;
+            background: #fff;
+            border: 1px solid var(--gray);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .cart-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .cart-lines {
+            display: grid;
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .cart-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--gray);
+            border-radius: 8px;
+            background: var(--gray-light);
+        }
+
+        .empty-cart {
+            color: var(--gray-dark);
+            text-align: center;
+            padding: 16px 0;
+        }
+
+        @media (max-width: 1100px) {
+            .pharmacy-layout {
+                grid-template-columns: 1fr;
+            }
+            .pharmacy-cart {
+                position: static;
+            }
+        }
+
+        /* ==================== PREMIUM TABLE ==================== */
+        .premium-table-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding: 14px 18px;
+            border: 1px solid rgba(74, 144, 226, 0.12);
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(240, 248, 255, 0.9) 100%);
+            box-shadow: 0 14px 32px rgba(74, 144, 226, 0.08);
+            backdrop-filter: blur(14px);
+        }
+
+        .premium-table-toolbar-left,
+        .premium-table-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .premium-table-count {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(74, 144, 226, 0.08);
+            border: 1px solid rgba(74, 144, 226, 0.12);
+            color: var(--primary-dark);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .premium-table-search {
+            width: min(320px, 48vw);
+            padding: 12px 16px;
+            border: 1px solid rgba(74, 144, 226, 0.16);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--dark);
+            font-family: inherit;
+            font-size: 14px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transition: var(--transition);
+        }
+
+        .premium-table-search:focus {
+            outline: none;
+            border-color: rgba(74, 144, 226, 0.4);
+            box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.1), 0 12px 28px rgba(74, 144, 226, 0.12);
+        }
+
+        .premium-density-toggle {
+            padding: 0 18px;
+            min-height: 46px;
+            border: 1px solid rgba(74, 144, 226, 0.16);
+            border-radius: 16px;
+            background: linear-gradient(135deg, #ffffff 0%, #eaf5ff 100%);
+            color: var(--primary-dark);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(74, 144, 226, 0.08);
+            transition: var(--transition);
+        }
+
+        .premium-density-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(74, 144, 226, 0.14);
+        }
+
+        .premium-table {
+            width: 100%;
+            min-width: 920px;
+            border-collapse: separate;
+            border-spacing: 0 12px;
+        }
+
+        .premium-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            padding: 16px 18px;
+            border: none;
+            background: linear-gradient(135deg, rgba(234, 244, 255, 0.96) 0%, rgba(214, 234, 248, 0.94) 100%);
+            color: var(--primary-dark);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            box-shadow: inset 0 -1px 0 rgba(74, 144, 226, 0.08), 0 8px 20px rgba(74, 144, 226, 0.06);
+            backdrop-filter: blur(12px);
+        }
+
+        .premium-table thead th:first-child {
+            border-top-left-radius: 18px;
+            border-bottom-left-radius: 18px;
+        }
+
+        .premium-table thead th:last-child {
+            border-top-right-radius: 18px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .premium-table tbody tr {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 251, 255, 0.96) 100%);
+            box-shadow: 0 12px 28px rgba(74, 144, 226, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transition: transform 0.28s ease, box-shadow 0.28s ease, background 0.28s ease;
+        }
+
+        .premium-table tbody tr:hover:not(.premium-empty-row) {
+            transform: translateY(-3px);
+            box-shadow: 0 18px 34px rgba(74, 144, 226, 0.14), 0 0 0 1px rgba(74, 144, 226, 0.06);
+        }
+
+        .premium-table tbody td {
+            padding: 18px;
+            border: none;
+            vertical-align: middle;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        .premium-table tbody td:first-child {
+            border-top-left-radius: 18px;
+            border-bottom-left-radius: 18px;
+            font-weight: 700;
+        }
+
+        .premium-table tbody td:last-child {
+            border-top-right-radius: 18px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .premium-empty-row {
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        .premium-empty-cell {
+            padding: 26px 20px !important;
+            border-radius: 20px;
+            text-align: center !important;
+            color: var(--gray-dark);
+            font-weight: 600;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(234, 244, 255, 0.88) 100%);
+            border: 1px dashed rgba(74, 144, 226, 0.18);
+        }
+
+        .premium-sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .premium-sortable::after {
+            content: '⇅';
+            margin-left: 8px;
+            font-size: 11px;
+            opacity: 0.35;
+        }
+
+        .premium-sortable[data-sort-direction="asc"]::after {
+            content: '↑';
+            opacity: 1;
+        }
+
+        .premium-sortable[data-sort-direction="desc"]::after {
+            content: '↓';
+            opacity: 1;
+        }
+
+        /* ==================== RESPONSIVE TABLE MOBILE ==================== */
+        @media (max-width: 768px) {
+            .premium-table {
+                min-width: 100%;
+                border-spacing: 0;
+            }
+
+            .premium-table thead {
+                display: none;
+            }
+
+            .premium-table tbody {
+                display: grid;
+                gap: 14px;
+            }
+
+            .premium-table tbody tr,
+            .premium-table tbody tr:nth-child(even):not(.premium-empty-row) {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 16px;
+                border-radius: 22px;
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 248, 255, 0.96) 100%);
+                box-shadow: var(--shadow-md);
+            }
+
+            .premium-table tbody td,
+            .premium-table tbody td:first-child,
+            .premium-table tbody td:last-child {
+                display: grid;
+                grid-template-columns: minmax(110px, 42%) minmax(0, 1fr);
+                align-items: start;
+                gap: 12px;
+                padding: 0;
+                border-radius: 0;
+                white-space: normal;
+            }
+
+            .premium-table tbody td::before {
+                content: attr(data-label);
+                color: var(--primary-dark);
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            .premium-table .action-stack {
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .premium-empty-row {
+                display: block !important;
+            }
+
+            .premium-empty-cell {
+                display: block !important;
+                padding: 22px !important;
+            }
+
+            .premium-table-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .premium-table-toolbar-left,
+            .premium-table-toolbar-right {
+                width: 100%;
+            }
+
+            .premium-table-search {
+                width: 100%;
+            }
+        }
+
+        /* ==================== UTILITAIRES ==================== */
+        .text-center { text-align: center; }
+        .text-muted { color: var(--gray-dark); }
+        .mt-8 { margin-top: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .mt-16 { margin-top: 16px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-12 { margin-bottom: 12px; }
+        .mb-16 { margin-bottom: 16px; }
+        .gap-8 { gap: 8px; }
+        .gap-12 { gap: 12px; }
+        .flex { display: flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .w-full { width: 100%; }
+
+        /* ==================== BUG FIXES ==================== */
+        .dashboard-records-grid {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            width: 100%;
+        }
+
+        .dashboard-records-grid > .dashboard-card {
+            grid-column: 1 / -1 !important;
+            width: 100%;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.72);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+
+        .chart-hero-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 22px;
+            margin-bottom: 26px;
+        }
+
+        .chart-panel {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .chart-panel h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            font-size: 17px;
+            color: var(--dark);
+        }
+
+        .chart-panel canvas {
+            width: 100% !important;
+            height: 260px !important;
+        }
+
+        .chart-panel.chart-gauge canvas {
+            height: 240px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOADING ===== -->
+    <div class="loading-overlay active" id="loadingOverlay">
+        <div class="loading-content">
+            <img src="logo.jpg" alt="I Hub" class="loading-logo" id="logoImg">
+            <div class="loading-pulse"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== MOBILE MENU ===== -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Ouvrir le menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ===== SIDEBAR OVERLAY ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-mark">
+                <i class="fas fa-heartbeat"></i>
+            </div>
+            <div>
+                <h2>I Hub</h2>
+                <p id="userInfo">Chargement...</p>
+            </div>
+        </div>
+        <div class="nav-menu" id="navMenu"></div>
+        <div class="sidebar-footer">
+            <button class="btn btn-danger btn-sm btn-full" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content" id="mainContent"></main>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            API_URL: 'https://jokair.onrender.com/api',
+            AI_API_URL: 'https://odimba-1.onrender.com/api/ai',
+            APP_NAME: 'I-Hub',
+            APP_VERSION: '1.0.0',
+            HOSPITAL_NAME: 'I Hub',
+            HOSPITAL_PHONE: '+243 974 336 700',
+            HOSPITAL_EMAIL: 'jeremyodimba322@gmail.com',
+            HOSPITAL_ADDRESS: '',
+            HOSPITAL_LOGO_URL: 'logo.jpg',
+            CURRENCY: 'Fc',
+            ITEMS_PER_PAGE: 20,
+            DEBUG: false
+        };
+
+        // ==================== STORAGE ====================
+        class SecureStorage {
+            static set(key, value, persistent = false) {
+                try {
+                    const target = persistent ? localStorage : sessionStorage;
+                    const secondary = persistent ? sessionStorage : localStorage;
+                    target.setItem(key, JSON.stringify(value));
+                    secondary.removeItem(key);
+                } catch(e) { console.error('Storage error:', e); }
+            }
+            static get(key) {
+                try {
+                    const sessionItem = sessionStorage.getItem(key);
+                    if (sessionItem !== null) return JSON.parse(sessionItem);
+                    const localItem = localStorage.getItem(key);
+                    return localItem ? JSON.parse(localItem) : null;
+                } catch(e) { return null; }
+            }
+            static remove(key) {
+                sessionStorage.removeItem(key);
+                localStorage.removeItem(key);
+            }
+            static clear() {
+                sessionStorage.clear();
+                localStorage.clear();
+            }
+        }
+
+        // ==================== API SERVICE ====================
+        class APIService {
+            constructor(baseURL) { this.baseURL = baseURL; }
+
+            async request(endpoint, options = {}, retries = 1) {
+                const token = SecureStorage.get('token');
+                const headers = { ...options.headers };
+                if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                    const response = await fetch(`${this.baseURL}${endpoint}`, {
+                        ...options,
+                        headers,
+                        credentials: 'include',
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (response.status === 401) { this.logout(); throw new Error('Session expirée.'); }
+                    if (response.status === 403) throw new Error('Accès interdit.');
+                    if (response.status === 404) throw new Error('Ressource introuvable.');
+                    if (response.status >= 500) {
+                        if (retries > 0) {
+                            await new Promise(r => setTimeout(r, 1000));
+                            return this.request(endpoint, options, retries - 1);
+                        }
+                        throw new Error('Erreur serveur.');
+                    }
+
+                    const responseType = response.headers.get('content-type') || '';
+                    let data = null;
+                    if (response.status !== 204 && response.status !== 205) {
+                        if (responseType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            data = text ? { message: text } : null;
+                        }
+                    }
+                    if (!response.ok) throw new Error(data?.error || data?.message || 'Erreur inconnue');
+                    return data;
+                } catch(error) {
+                    if (error.name === 'AbortError') throw new Error('Requête expirée.');
+                    if (error.message === 'Failed to fetch') throw new Error('Serveur indisponible.');
+                    throw error;
+                }
+            }
+            get(endpoint) { return this.request(endpoint, { method: 'GET' }); }
+            post(endpoint, body) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); }
+            put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }); }
+            patch(endpoint, body) { return this.request(endpoint, { method: 'PATCH', body: JSON.stringify(body) }); }
+            delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); }
+            logout() { SecureStorage.clear(); window.location.href = 'index.html'; }
+        }
+
+        // ==================== VARIABLES GLOBALES ====================
+        let api = null;
+        let currentUser = null;
+        let patientSearchTimer = null;
+        let patientsCache = [];
+        let appointmentsCache = [];
+        let cim10Data = [];
+
+        let consultationState = {
+            patientId: null,
+            patient: null,
+            vitals: null,
+            diagnostics: [],
+            medicaments: [],
+            examens: [],
+            actes: [],
+            symptoms: '',
+            observations: ''
+        };
+
+        let waitingRoomData = {
+            queue: [],
+            vitals: [],
+            patientVitals: {}
+        };
+
+        let prescriptionState = {
+            patientId: null,
+            medicaments: [],
+            examens: [],
+            actes: [],
+            medicamentList: [
+                { id: 1, name: 'Amoxicilline', dosage: '500mg', stock: 45 },
+                { id: 2, name: 'Paracétamol', dosage: '1000mg', stock: 120 },
+                { id: 3, name: 'Ibuprofène', dosage: '400mg', stock: 80 },
+                { id: 4, name: 'Oméprazole', dosage: '20mg', stock: 30 },
+                { id: 5, name: 'Dexaméthasone', dosage: '4mg', stock: 15 },
+                { id: 6, name: 'Morphine', dosage: '10mg', stock: 8 },
+                { id: 7, name: 'Doliprane', dosage: '500mg', stock: 200 },
+                { id: 8, name: 'Augmentin', dosage: '1g', stock: 25 },
+                { id: 9, name: 'Ventoline', dosage: '100µg', stock: 12 },
+                { id: 10, name: 'Lévothyrox', dosage: '50µg', stock: 40 }
+            ],
+            examenList: [
+                'Prise de sang', 'Analyse d\'urine', 'Radio thorax',
+                'Scanner', 'IRM', 'Échographie', 'Mammographie',
+                'Test COVID', 'Bilan hépatique', 'Bilan rénal'
+            ],
+            acteList: [
+                'Pansement', 'Injection', 'Perfusion', 'Suture',
+                'Rééducation', 'Kinésithérapie', 'Transfusion',
+                'Petite chirurgie', 'Plâtre', 'Pose de cathéter'
+            ]
+        };
+
+        // ==================== HELPERS ====================
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        function sanitizeInput(input) {
+            if (input === null || input === undefined) return '';
+            return String(input).replace(/[<>`]/g, '').trim();
+        }
+
+        function safeText(value, fallback = '—') {
+            return value === null || value === undefined || value === '' ? fallback : String(value);
+        }
+
+        function formatDate(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('fr-FR');
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('fr-FR');
+        }
+
+        function getGreetingMessage(date = new Date()) {
+            const hour = date.getHours();
+            if (hour < 12) return 'Bonjour';
+            if (hour < 18) return 'Bon après-midi';
+            return 'Bonsoir';
+        }
+
+        function formatShortTime(date = new Date()) {
+            return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function sortByDateDesc(items, key) {
+            return [...(items || [])].sort((a, b) => {
+                const left = new Date(a?.[key] || a?.created_at || 0).getTime();
+                const right = new Date(b?.[key] || b?.created_at || 0).getTime();
+                return right - left;
+            });
+        }
+
+        function getPatientStatusLabel(status) {
+            const labels = { active: 'Actif', admitted: 'Hospitalisé', discharged: 'Sorti' };
+            return labels[status] || safeText(status, 'Actif');
+        }
+
+        function getPatientStatusBadgeClass(status) {
+            if (status === 'admitted') return 'warning';
+            if (status === 'discharged') return 'info';
+            return 'success';
+        }
+
+        function getGenderLabel(gender) {
+            const labels = { M: 'Masculin', F: 'Féminin' };
+            return labels[gender] || safeText(gender, 'Non renseigné');
+        }
+
+        function getRoleLabel(role) {
+            const roles = {
+                'super_admin': 'Administrateur',
+                'docteur': 'Médecin',
+                'infirmier': 'Infirmière',
+                'laboratoire': 'Laboratoire',
+                'pharmacie': 'Pharmacie',
+                'reception': 'Réception'
+            };
+            return roles[role] || role;
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar')?.classList.remove('mobile-open');
+            document.getElementById('sidebarOverlay')?.classList.remove('active');
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar || !overlay) return;
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active', sidebar.classList.contains('mobile-open'));
+        }
+
+        function syncResponsiveChrome() {
+            const menuButton = document.getElementById('mobileMenuBtn');
+            if (!menuButton) return;
+            menuButton.style.display = currentUser && window.innerWidth <= 1024 ? 'flex' : 'none';
+            if (window.innerWidth > 1024) closeSidebar();
+        }
+
+        function getCurrentRole() {
+            return currentUser?.role || '';
+        }
+
+        function isAdmin() {
+            return getCurrentRole() === 'super_admin';
+        }
+
+        function canAccessPage(pageId) {
+            if (isAdmin()) return true;
+            return (ROLE_PAGE_ACCESS[getCurrentRole()] || []).includes(pageId);
+        }
+
+        function filterForCurrentDoctor(list) {
+            if (getCurrentRole() !== 'docteur') return list;
+            const myId = String(currentUser?.id || '');
+            const myName = String(currentUser?.name || '').toLowerCase();
+            return (Array.isArray(list) ? list : []).filter(item => {
+                const idFields = ['assigned_doctor_id','doctor_id','practitioner_id','provider_id','prescriber_id','requested_by','created_by','user_id','assigned_to'];
+                const nameFields = ['doctor_name','practitioner_name','provider_name','prescriber_name','created_by_name','user_name','assigned_doctor_name'];
+                if (myId && idFields.some(f => String(item?.[f] || '') === myId)) return true;
+                if (myName && nameFields.some(f => String(item?.[f] || '').toLowerCase() === myName)) return true;
+                return false;
+            });
+        }
+
+        function isOwnRecord(rec) {
+            const myId = String(currentUser?.id || '');
+            const myName = String(currentUser?.name || '').toLowerCase();
+            if (!myId && !myName) return true;
+            const idFields = ['assigned_doctor_id','doctor_id','practitioner_id','provider_id','prescriber_id','requested_by','created_by','user_id','assigned_to'];
+            const nameFields = ['doctor_name','practitioner_name','provider_name','prescriber_name','created_by_name','user_name','assigned_doctor_name'];
+            if (myId && idFields.some(f => String(rec?.[f] || '') === myId)) return true;
+            if (myName && nameFields.some(f => String(rec?.[f] || '').toLowerCase() === myName)) return true;
+            return false;
+        }
+
+        function filterAppointmentsForCurrentRole(appointments) {
+            const list = Array.isArray(appointments) ? appointments : [];
+            return list.filter(isOwnAppointment);
+        }
+
+        function isOwnAppointment(appointment) {
+            if (getCurrentRole() !== 'docteur') return true;
+            return isOwnRecord(appointment);
+        }
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            try { return new Date(d).toLocaleString('fr-FR'); } catch { return d; }
+        }
+
+        function getPatientAgeYears(patient) {
+            const rawDate = patient?.date_of_birth || patient?.birth_date || patient?.dob;
+            if (!rawDate) return null;
+            const birthDate = new Date(rawDate);
+            if (Number.isNaN(birthDate.getTime())) return null;
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+            return age;
+        }
+
+        function getTriageColor(vitals) {
+            if (!vitals) return 'green';
+            const temp = parseFloat(vitals.temperature);
+            const hr = parseInt(vitals.heart_rate);
+            const spo2 = parseFloat(vitals.oxygen_saturation);
+            if ((temp && temp > 39) || (hr && hr > 120) || (spo2 && spo2 < 90)) return 'red';
+            if ((temp && temp > 38.5) || (hr && hr > 100) || (spo2 && spo2 < 94)) return 'orange';
+            return 'green';
+        }
+
+        function getTriageLabel(color) {
+            const labels = { red: 'Urgent', orange: 'Modéré', green: 'Stable' };
+            return labels[color] || 'Stable';
+        }
+
+        function statusBadge(s) {
+            const statusMap = {
+                waiting: { label: 'En attente', color: 'warning' },
+                assigned: { label: 'Assigné', color: 'info' },
+                in_consultation: { label: 'En consultation', color: 'primary' },
+                completed: { label: 'Terminé', color: 'success' },
+                hospitalized: { label: 'Hospitalisé', color: 'danger' },
+                discharged: { label: 'Sorti', color: 'success' }
+            };
+            const info = statusMap[s] || { label: s || '—', color: 'secondary' };
+            return `<span class="badge badge-${info.color}">${info.label}</span>`;
+        }
+
+        // ==================== ROLE ACCESS ====================
+        const ROLE_PAGE_ACCESS = {
+            super_admin: ['dashboard', 'waiting-room', 'consultation', 'prescription', 'patients', 'appointments', 'laboratory', 'care', 'reports', 'ai-assistant'],
+            docteur: ['dashboard', 'waiting-room', 'consultation', 'prescription', 'patients', 'appointments', 'laboratory', 'care', 'reports', 'ai-assistant']
+        };
+
+        // ==================== BUILD TABLE SECTION ====================
+        function buildTableSection(headers, rowsMarkup, emptyMessage) {
+            if (!rowsMarkup || !rowsMarkup.length) {
+                return `<div class="empty-state"><i class="fas fa-folder-open" style="font-size:20px;margin-bottom:8px;color:var(--primary);"></i><div>${emptyMessage}</div></div>`;
+            }
+            return `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr></thead>
+                        <tbody>${rowsMarkup.join('')}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // ==================== NAVIGATION ====================
+        function buildNavigation() {
+            const navMenu = document.getElementById('navMenu');
+            const navItems = [
+                { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', roles: ['super_admin', 'docteur'] },
+                { id: 'waiting-room', icon: 'fa-clock', label: 'Salle d\'attente', roles: ['super_admin', 'docteur'] },
+                { id: 'consultation', icon: 'fa-stethoscope', label: 'Consultation', roles: ['super_admin', 'docteur'] },
+                { id: 'prescription', icon: 'fa-prescription-bottle', label: 'Prescription', roles: ['super_admin', 'docteur'] },
+                { id: 'patients', icon: 'fa-users', label: 'Patients', roles: ['super_admin', 'docteur'] },
+                { id: 'appointments', icon: 'fa-calendar-alt', label: 'Rendez-vous', roles: ['super_admin', 'docteur'] },
+                { id: 'laboratory', icon: 'fa-flask', label: 'Laboratoire', roles: ['super_admin', 'docteur'] },
+                { id: 'care', icon: 'fa-heartbeat', label: 'Soins', roles: ['super_admin', 'docteur'] },
+                { id: 'reports', icon: 'fa-chart-bar', label: 'Rapports', roles: ['super_admin', 'docteur'] },
+                { id: 'ai-assistant', icon: 'fa-brain', label: 'IA médicale', roles: ['super_admin', 'docteur'] }
+            ];
+
+            const allowedItems = navItems.filter(item => item.roles.includes(currentUser.role));
+            navMenu.innerHTML = allowedItems.map(item => {
+                return `<div class="nav-item" data-page="${item.id}" onclick="loadPage('${item.id}', event)"><i class="fas ${item.icon}"></i><span>${item.label}</span></div>`;
+            }).join('');
+        }
+
+        // ==================== PAGE LOADER ====================
+        async function loadPage(pageId, event) {
+            const mainContent = document.getElementById('mainContent');
+            if (!canAccessPage(pageId)) {
+                mainContent.innerHTML = `
+                    <div class="empty-state" style="margin-top:40px;">
+                        <i class="fas fa-user-lock" style="font-size:48px;color:var(--warning);margin-bottom:16px;"></i>
+                        <h3 style="margin-bottom:10px;">Accès limité</h3>
+                        <p>Cette section n'est pas disponible pour votre rôle actuel.</p>
+                        <p style="margin-top:12px;"><span class="badge badge-info"><i class="fas fa-user-tag"></i> ${escapeHtml(getRoleLabel(currentUser?.role))}</span></p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            const activeItem = event?.target?.closest('.nav-item') || document.querySelector(`.nav-item[data-page="${pageId}"]`);
+            activeItem?.classList.add('active');
+
+            showLoading();
+            try {
+                switch (pageId) {
+                    case 'dashboard': await loadDashboardStats(); break;
+                    case 'waiting-room': await loadWaitingRoom(); break;
+                    case 'consultation': await loadConsultation(); break;
+                    case 'prescription': await loadPrescription(); break;
+                    case 'patients': await loadPatients(); break;
+                    case 'appointments': await loadAppointments(); break;
+                    case 'laboratory': await loadLaboratory(); break;
+                    case 'care': await loadCare(); break;
+                    case 'reports': await loadReports(); break;
+                    case 'ai-assistant': await loadAIAssistant(); break;
+                    default: mainContent.innerHTML = `<div class="empty-state"><h3>Page en construction</h3></div>`;
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+                mainContent.innerHTML = `
+                    <div class="empty-state" style="margin-top:40px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size:40px;color:var(--warning);margin-bottom:10px;"></i>
+                        <h3 style="margin-bottom:10px;">Erreur de chargement</h3>
+                        <p>${escapeHtml(error.message)}</p>
+                        <button class="btn btn-primary" onclick="loadPage('${pageId}')" style="margin-top:18px;"><i class="fas fa-sync-alt"></i> Réessayer</button>
+                    </div>
+                `;
+            } finally {
+                hideLoading();
+                closeSidebar();
+            }
+        }
+
+        // ==================== DASHBOARD ====================
+        function loadDashboard() {
+            const savedToken = SecureStorage.get('token');
+            const savedUser = SecureStorage.get('user');
+            if (savedToken && savedUser) currentUser = savedUser;
+            if (!currentUser) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('userInfo').innerHTML = `<strong>${escapeHtml(currentUser.name)}</strong><br><small>${escapeHtml(getRoleLabel(currentUser.role))}</small>`;
+            buildNavigation();
+            syncResponsiveChrome();
+            loadPage('dashboard');
+        }
+
+        // ==================== DASHBOARD STATS ====================
+        async function loadDashboardStats() {
+            const viewAppointments = canAccessPage('appointments');
+            const viewCare = canAccessPage('care');
+
+            const fetches = [
+                api.get('/patients').catch(() => []),
+                viewAppointments ? api.get('/appointments').catch(() => []) : Promise.resolve([]),
+                viewCare ? api.get('/care').catch(() => []) : Promise.resolve([]),
+                api.get('/workflow/queue').catch(() => [])
+            ];
+
+            const [patients, rawAppointments, careLogs, queue] = await Promise.all(fetches);
+            const appointments = viewAppointments ? filterAppointmentsForCurrentRole(rawAppointments) : [];
+
+            patientsCache = sortByDateDesc(patients, 'created_at');
+            const todayCare = viewCare ? careLogs.filter(c => new Date(c.date).toDateString() === new Date().toDateString()).length : 0;
+            const waitingCount = Array.isArray(queue) ? queue.filter(q => {
+                const myId = String(currentUser?.id || '');
+                const myName = String(currentUser?.name || '').toLowerCase();
+                return String(q.assigned_doctor_id || q.doctor_id || '') === myId ||
+                       (q.doctor_name || q.assigned_doctor_name || '').toLowerCase() === myName;
+            }).length : 0;
+
+            const stats = [
+                { icon: 'fa-users', value: patients.length, label: 'Patients' },
+                { icon: 'fa-clock', value: waitingCount, label: 'En attente' },
+                { icon: 'fa-calendar-alt', value: appointments.length, label: 'Rendez-vous' },
+                { icon: 'fa-heartbeat', value: todayCare, label: 'Soins aujourd\'hui' }
+            ];
+
+            const dashboardNow = new Date();
+            const dashboardGreeting = getGreetingMessage(dashboardNow);
+            const dashboardTime = formatShortTime(dashboardNow);
+            const dashboardUserName = safeText(currentUser?.name, 'Utilisateur');
+
+            document.getElementById('mainContent').innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1>
+                    <div class="action-stack">
+                        <span class="badge badge-info"><i class="far fa-calendar"></i> ${new Date().toLocaleDateString('fr-FR')}</span>
+                    </div>
+                </div>
+                <section class="dashboard-greeting-card">
+                    <div class="dashboard-greeting-copy">
+                        <span class="dashboard-greeting-date"><i class="far fa-calendar"></i> ${dashboardNow.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+                        <h2>${dashboardGreeting}, ${escapeHtml(dashboardUserName)}</h2>
+                        <p>Voici votre résumé d'activité en temps réel.</p>
+                    </div>
+                    <div class="dashboard-time-card">
+                        <span>Heure actuelle</span>
+                        <strong>${dashboardTime}</strong>
+                        <small>${escapeHtml(getRoleLabel(currentUser?.role))}</small>
+                    </div>
+                </section>
+                <div class="stats-grid">
+                    ${stats.map(stat => `
+                        <div class="stat-card">
+                            <div class="stat-header"><i class="fas ${stat.icon}"></i></div>
+                            <div class="stat-value">${stat.value}</div>
+                            <div class="stat-label">${stat.label}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="dashboard-grid dashboard-records-grid">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-user-injured"></i> Derniers patients</h3>
+                        ${buildTableSection(
+                            ['Nom', 'Téléphone', 'Statut', 'Date'],
+                            sortByDateDesc(patients, 'created_at').slice(0, 6).map(patient => `
+                                <tr>
+                                    <td><strong>${escapeHtml(patient.full_name)}</strong></td>
+                                    <td>${escapeHtml(safeText(patient.phone))}</td>
+                                    <td><span class="badge badge-${getPatientStatusBadgeClass(patient.status)}">${escapeHtml(getPatientStatusLabel(patient.status))}</span></td>
+                                    <td>${formatDate(patient.created_at)}</td>
+                                </tr>
+                            `),
+                            'Aucun patient enregistré.'
+                        )}
+                    </div>
+                    ${viewCare ? `<div class="dashboard-card">
+                        <h3><i class="fas fa-notes-medical"></i> Derniers soins</h3>
+                        ${buildTableSection(
+                            ['Patient', 'Type', 'Date'],
+                            sortByDateDesc(careLogs, 'date').slice(0, 6).map(c => `
+                                <tr>
+                                    <td><strong>${escapeHtml(c.patient_name)}</strong></td>
+                                    <td><span class="badge badge-info">${escapeHtml(c.care_type)}</span></td>
+                                    <td>${formatDate(c.date)}</td>
+                                </tr>
+                            `),
+                            'Aucun soin enregistré.'
+                        )}
+                    </div>` : ''}
+                </div>
+            `;
+        }
+
+        // ==================== WAITING ROOM ====================
+        async function loadWaitingRoom() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <div><h1><i class="fas fa-clock"></i> Salle d'attente</h1><p>Patients assignés en attente de consultation</p></div>
+                </div>
+                <div id="waitingRoomContainer"><div class="loading-spinner"></div></div>
+            `;
+            try {
+                const [queue, vitals] = await Promise.all([
+                    api.get('/workflow/queue').catch(() => []),
+                    api.get('/workflow/vitals').catch(() => [])
+                ]);
+                waitingRoomData.queue = Array.isArray(queue) ? queue : (queue?.items || []);
+                waitingRoomData.vitals = Array.isArray(vitals) ? vitals : (vitals?.items || []);
+
+                const myId = String(currentUser?.id || '');
+                const myName = String(currentUser?.name || '').toLowerCase();
+                const filtered = waitingRoomData.queue.filter(q =>
+                    String(q.assigned_doctor_id || q.doctor_id || '') === myId ||
+                    (q.doctor_name || q.assigned_doctor_name || '').toLowerCase() === myName
+                );
+                waitingRoomData.queue = filtered;
+
+                filtered.forEach(q => {
+                    const pid = q.patient_id || q.id;
+                    const vitalsData = waitingRoomData.vitals.find(v => String(v.patient_id || v.patient?.id) === String(pid));
+                    waitingRoomData.patientVitals[pid] = vitalsData;
+                });
+
+                renderWaitingRoomTable();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+                document.getElementById('waitingRoomContainer').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Erreur: ${escapeHtml(e.message)}</p></div>`;
+            }
+        }
+
+        function renderWaitingRoomTable() {
+            const c = document.getElementById('waitingRoomContainer');
+            if (!c) return;
+            if (!waitingRoomData.queue.length) {
+                c.innerHTML = `<div class="empty-state"><i class="fas fa-clock"></i><p>Aucun patient en salle d'attente</p></div>`;
+                return;
+            }
+            c.innerHTML = `
+                <div class="filters-row">
+                    <input class="form-control" id="waitingRoomSearch" placeholder="🔍 Rechercher patient..." oninput="filterWaitingRoom(this.value)">
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>#</th><th>Patient</th><th>Heure arrivée</th>
+                            <th>Signes vitaux</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr></thead>
+                        <tbody id="waitingRoomTbody">
+                            ${waitingRoomData.queue.map((q, i) => rowWaitingRoom(q, i)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function rowWaitingRoom(q, i) {
+            const pid = q.patient_id || q.id;
+            const pname = q.patient_name || q.patient?.name || '—';
+            const vitals = waitingRoomData.patientVitals[pid];
+            const hasVitals = !!vitals;
+            const triageColor = getTriageColor(vitals);
+            const triageLabel = getTriageLabel(triageColor);
+
+            let vitalsDisplay = '<span style="color:var(--gray-dark);">—</span>';
+            if (hasVitals) {
+                vitalsDisplay = `
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;font-size:11px;">
+                        <span>🌡️ ${vitals.temperature || '—'}°C</span>
+                        <span>💓 ${vitals.heart_rate || '—'}</span>
+                        <span>🩸 ${vitals.blood_pressure || '—'}</span>
+                        <span style="display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:999px;background:${triageColor === 'red' ? '#fee2e2' : triageColor === 'orange' ? '#ffedd5' : '#dcfce7'};color:${triageColor === 'red' ? '#dc2626' : triageColor === 'orange' ? '#d97706' : '#16a34a'};">
+                            <span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:${triageColor === 'red' ? '#dc2626' : triageColor === 'orange' ? '#d97706' : '#16a34a'};"></span>
+                            ${triageLabel}
+                        </span>
+                    </div>
+                `;
+            }
+
+            const isInConsultation = q.status === 'in_consultation';
+
+            return `<tr>
+                <td>${q.order ?? (i+1)}</td>
+                <td><strong>${escapeHtml(pname)}</strong></td>
+                <td>${fmtDate(q.arrived_at || q.created_at)}</td>
+                <td>${vitalsDisplay}</td>
+                <td>${statusBadge(q.status || 'waiting')}</td>
+                <td>
+                    <div class="action-stack" style="gap:4px;flex-wrap:wrap;">
+                        ${!isInConsultation ? `
+                            <button class="btn btn-sm btn-success" onclick="callPatient(${pid}, '${escapeHtml(pname)}')" ${hasVitals ? '' : 'disabled title="Signes vitaux obligatoires avant d\'appeler"'}><i class="fas fa-bell"></i> Appeler</button>
+                        ` : `
+                            <span style="font-size:12px;color:var(--success);"><i class="fas fa-check-circle"></i> En consultation</span>
+                        `}
+                        <button class="btn btn-sm btn-info" onclick="openPatientRecord(${pid})"><i class="fas fa-folder-open"></i> Dossier</button>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        function filterWaitingRoom(q) {
+            const tbody = document.getElementById('waitingRoomTbody');
+            if (!tbody) return;
+            const term = (q || '').toLowerCase();
+            const filtered = waitingRoomData.queue.filter(x => (x.patient_name || x.patient?.name || '').toLowerCase().includes(term));
+            tbody.innerHTML = filtered.map((x, i) => rowWaitingRoom(x, i)).join('');
+        }
+
+        async function callPatient(patientId, patientName) {
+            showLoading();
+            try {
+                await api.patch(`/workflow/queue/${patientId}`, { status: 'in_consultation' });
+                showToast(`Patient ${escapeHtml(patientName)} appelé en consultation`, 'success');
+
+                const patient = await api.get(`/patients/${patientId}`);
+                const vitals = waitingRoomData.patientVitals[patientId];
+
+                consultationState.patientId = patientId;
+                consultationState.patient = patient;
+                consultationState.vitals = vitals || null;
+                consultationState.diagnostics = [];
+                consultationState.medicaments = [];
+                consultationState.examens = [];
+                consultationState.actes = [];
+                consultationState.symptoms = '';
+                consultationState.observations = '';
+
+                loadPage('consultation');
+                loadWaitingRoom();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function openPatientRecord(patientId) {
+            showLoading();
+            try {
+                const patient = await api.get(`/patients/${patientId}`);
+                const vitals = waitingRoomData.patientVitals[patientId];
+                consultationState.patientId = patientId;
+                consultationState.patient = patient;
+                consultationState.vitals = vitals || null;
+                consultationState.diagnostics = [];
+                consultationState.medicaments = [];
+                consultationState.examens = [];
+                consultationState.actes = [];
+                consultationState.symptoms = '';
+                consultationState.observations = '';
+                loadPage('consultation');
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== CONSULTATION ====================
+        async function loadConsultation() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+
+            if (!consultationState.patient) {
+                main.innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-stethoscope"></i> Consultation</h1>
+                    </div>
+                    <div class="empty-state">
+                        <i class="fas fa-user" style="font-size:40px;color:var(--primary);"></i>
+                        <p>Sélectionnez un patient depuis la salle d'attente ou recherchez un patient.</p>
+                        <div style="margin-top:12px;">
+                            <button class="btn btn-primary" onclick="loadPage('waiting-room')"><i class="fas fa-clock"></i> Salle d'attente</button>
+                            <button class="btn btn-secondary" onclick="openPatientSearch()"><i class="fas fa-search"></i> Rechercher</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const patient = consultationState.patient;
+            const vitals = consultationState.vitals;
+            const age = getPatientAgeYears(patient);
+            const triageColor = getTriageColor(vitals);
+            const triageLabel = getTriageLabel(triageColor);
+
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-stethoscope"></i> Consultation</h1>
+                    <div class="action-stack">
+                        <button class="btn btn-success" onclick="endConsultation()"><i class="fas fa-check"></i> Terminer consultation</button>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:16px;background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <div style="flex:1;">
+                        <h2 style="margin:0;">${escapeHtml(patient.full_name)}</h2>
+                        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:4px;font-size:13px;color:var(--gray-dark);">
+                            <span>🆔 #${patient.id}</span>
+                            <span>📅 ${age !== null ? age + ' ans' : '—'}</span>
+                            <span>⚤ ${escapeHtml(getGenderLabel(patient.gender))}</span>
+                            <span>🩸 ${escapeHtml(safeText(patient.blood_type))}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        ${vitals ? `
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 12px;background:${triageColor === 'red' ? '#fee2e2' : triageColor === 'orange' ? '#ffedd5' : '#dcfce7'};border-radius:8px;">
+                                <span>🌡️ ${vitals.temperature || '—'}°C</span>
+                                <span>💓 ${vitals.heart_rate || '—'}</span>
+                                <span>🩸 ${vitals.blood_pressure || '—'}</span>
+                                <span style="font-weight:600;color:${triageColor === 'red' ? '#dc2626' : triageColor === 'orange' ? '#d97706' : '#16a34a'};">${triageLabel}</span>
+                            </div>
+                        ` : '<span style="color:var(--warning);">⚠️ Pas de signes vitaux</span>'}
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div style="background:var(--light);border-radius:12px;padding:12px;box-shadow:var(--shadow);">
+                        <h4 style="margin:0 0 4px;"><i class="fas fa-notes-medical"></i> Antécédents</h4>
+                        <p style="margin:0;font-size:14px;">${escapeHtml(safeText(patient.medical_history || patient.history, 'Aucun'))}</p>
+                    </div>
+                    <div style="background:var(--light);border-radius:12px;padding:12px;box-shadow:var(--shadow);">
+                        <h4 style="margin:0 0 4px;"><i class="fas fa-exclamation-triangle"></i> Allergies</h4>
+                        <p style="margin:0;font-size:14px;">${escapeHtml(safeText(patient.allergies || patient.allergy, 'Aucune'))}</p>
+                    </div>
+                </div>
+
+                <div style="background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-search-plus"></i> Examen clinique</h4>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Symptômes</label>
+                            <textarea class="form-control" id="consultationSymptoms" rows="2" placeholder="Décrire les symptômes...">${escapeHtml(consultationState.symptoms)}</textarea>
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Observations</label>
+                            <textarea class="form-control" id="consultationObservations" rows="2" placeholder="Observations cliniques...">${escapeHtml(consultationState.observations)}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-diagnoses"></i> Diagnostic (CIM-10)</h4>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <input class="form-control" id="cim10Search" placeholder="🔍 Rechercher un diagnostic..." style="flex:1;min-width:200px;" oninput="filterCIM10(this.value)">
+                        <button class="btn btn-primary" onclick="addDiagnostic()"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                    <div id="cim10Results" style="max-height:200px;overflow-y:auto;margin-top:8px;display:none;border:1px solid var(--gray);border-radius:4px;background:#fff;"></div>
+                    <div id="selectedDiagnostics" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;"></div>
+                </div>
+
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="saveConsultation()"><i class="fas fa-save"></i> Sauvegarder</button>
+                    <button class="btn btn-success" onclick="goToPrescription()"><i class="fas fa-prescription-bottle"></i> Prescrire</button>
+                    <button class="btn btn-info" onclick="endConsultation()"><i class="fas fa-check-circle"></i> Terminer</button>
+                </div>
+            `;
+
+            renderSelectedDiagnostics();
+        }
+
+        function filterCIM10(value) {
+            const results = document.getElementById('cim10Results');
+            if (!results) return;
+            if (!value || value.length < 2) {
+                results.style.display = 'none';
+                return;
+            }
+            const term = value.toLowerCase();
+            const filtered = cim10Data.filter(d => 
+                d.code.toLowerCase().includes(term) || 
+                d.label.toLowerCase().includes(term)
+            ).slice(0, 20);
+
+            if (!filtered.length) {
+                results.innerHTML = '<div style="padding:8px;color:var(--gray-dark);">Aucun résultat</div>';
+            } else {
+                results.innerHTML = filtered.map(d => `
+                    <div style="padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--gray);display:flex;justify-content:space-between;" 
+                         onclick="selectCIM10('${d.code}', '${d.label.replace(/'/g, "\\'")}')">
+                        <span><strong>${d.code}</strong></span>
+                        <span>${d.label}</span>
+                    </div>
+                `).join('');
+            }
+            results.style.display = 'block';
+        }
+
+        function selectCIM10(code, label) {
+            if (!consultationState.diagnostics) consultationState.diagnostics = [];
+            if (!consultationState.diagnostics.find(d => d.code === code)) {
+                consultationState.diagnostics.push({ code, label });
+            }
+            document.getElementById('cim10Search').value = '';
+            document.getElementById('cim10Results').style.display = 'none';
+            renderSelectedDiagnostics();
+        }
+
+        function renderSelectedDiagnostics() {
+            const container = document.getElementById('selectedDiagnostics');
+            if (!container) return;
+            if (!consultationState.diagnostics || !consultationState.diagnostics.length) {
+                container.innerHTML = '<span style="color:var(--gray-dark);font-size:13px;">Aucun diagnostic ajouté</span>';
+                return;
+            }
+            container.innerHTML = consultationState.diagnostics.map(d => `
+                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--primary-light);padding:4px 10px;border-radius:999px;font-size:12px;">
+                    <strong>${d.code}</strong> - ${d.label}
+                    <span style="cursor:pointer;color:var(--danger);" onclick="removeDiagnostic('${d.code}')">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function removeDiagnostic(code) {
+            consultationState.diagnostics = consultationState.diagnostics.filter(d => d.code !== code);
+            renderSelectedDiagnostics();
+        }
+
+        function addDiagnostic() {
+            const input = document.getElementById('cim10Search');
+            const value = input.value.trim();
+            if (!value) return;
+            const found = cim10Data.find(d => 
+                d.code.toLowerCase() === value.toLowerCase() ||
+                d.label.toLowerCase().includes(value.toLowerCase())
+            );
+            if (found) {
+                selectCIM10(found.code, found.label);
+            } else {
+                showToast('Diagnostic non trouvé dans la liste CIM-10', 'warning');
+            }
+        }
+
+        async function saveConsultation() {
+            showLoading();
+            try {
+                const symptoms = sanitizeInput(document.getElementById('consultationSymptoms')?.value || '');
+                const observations = sanitizeInput(document.getElementById('consultationObservations')?.value || '');
+                consultationState.symptoms = symptoms;
+                consultationState.observations = observations;
+
+                await api.post('/workflow/consultations', {
+                    patient_id: consultationState.patientId,
+                    symptoms: symptoms,
+                    observations: observations,
+                    diagnostics: consultationState.diagnostics || [],
+                    doctor_id: currentUser.id
+                });
+
+                showToast('Consultation sauvegardée', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function goToPrescription() {
+            saveConsultation();
+            setTimeout(() => loadPage('prescription'), 500);
+        }
+
+        async function endConsultation() {
+            if (!confirm('Terminer la consultation ? Le patient sera retiré de la file d\'attente.')) return;
+            showLoading();
+            try {
+                await saveConsultation();
+                await api.patch(`/workflow/queue/${consultationState.patientId}`, { status: 'completed' });
+                showToast('Consultation terminée', 'success');
+                consultationState.patient = null;
+                consultationState.patientId = null;
+                consultationState.vitals = null;
+                consultationState.diagnostics = [];
+                consultationState.medicaments = [];
+                consultationState.examens = [];
+                consultationState.actes = [];
+                loadPage('waiting-room');
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function openPatientSearch() {
+            try {
+                const patients = await api.get('/patients');
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="patientSearchModal">
+                        <div class="modal-content" style="max-width:500px;">
+                            <div class="modal-header">
+                                <h3><i class="fas fa-search"></i> Rechercher un patient</h3>
+                                <span class="close-modal" onclick="closeModal('patientSearchModal')">&times;</span>
+                            </div>
+                            <div style="padding:16px;">
+                                <div class="form-group">
+                                    <input class="form-control" id="patientSearchInput" placeholder="Nom, téléphone, ID..." oninput="filterPatientSearch(this.value)">
+                                </div>
+                                <div id="patientSearchResults" style="max-height:300px;overflow-y:auto;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                window._patientSearchList = patients;
+                filterPatientSearch('');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function filterPatientSearch(value) {
+            const container = document.getElementById('patientSearchResults');
+            if (!container) return;
+            const term = (value || '').toLowerCase();
+            const filtered = (window._patientSearchList || []).filter(p => 
+                p.full_name.toLowerCase().includes(term) ||
+                (p.phone || '').includes(term) ||
+                String(p.id).includes(term)
+            ).slice(0, 20);
+
+            if (!filtered.length) {
+                container.innerHTML = '<div style="padding:12px;color:var(--gray-dark);">Aucun patient trouvé</div>';
+                return;
+            }
+            container.innerHTML = filtered.map(p => `
+                <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--gray);cursor:pointer;" onclick="selectPatientForConsultation(${p.id})">
+                    <div><strong>${escapeHtml(p.full_name)}</strong></div>
+                    <div style="font-size:12px;color:var(--gray-dark);">#${p.id} • ${escapeHtml(p.phone || '—')}</div>
+                </div>
+            `).join('');
+        }
+
+        async function selectPatientForConsultation(patientId) {
+            closeModal('patientSearchModal');
+            showLoading();
+            try {
+                const patient = await api.get(`/patients/${patientId}`);
+                const vitals = (await api.get('/workflow/vitals').catch(()=>[])).find(v => String(v.patient_id) === String(patientId));
+                consultationState.patientId = patientId;
+                consultationState.patient = patient;
+                consultationState.vitals = vitals || null;
+                consultationState.diagnostics = [];
+                consultationState.medicaments = [];
+                consultationState.examens = [];
+                consultationState.actes = [];
+                consultationState.symptoms = '';
+                consultationState.observations = '';
+                loadConsultation();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== PRESCRIPTION ====================
+        async function loadPrescription() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+
+            const patientId = consultationState.patientId;
+            const patient = consultationState.patient;
+
+            if (!patientId || !patient) {
+                main.innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-prescription-bottle"></i> Prescription</h1>
+                    </div>
+                    <div class="empty-state">
+                        <i class="fas fa-prescription" style="font-size:40px;color:var(--primary);"></i>
+                        <p>Veuillez d'abord sélectionner un patient dans la salle d'attente ou la consultation.</p>
+                        <div style="margin-top:12px;">
+                            <button class="btn btn-primary" onclick="loadPage('waiting-room')"><i class="fas fa-clock"></i> Salle d'attente</button>
+                            <button class="btn btn-secondary" onclick="loadPage('consultation')"><i class="fas fa-stethoscope"></i> Consultation</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            prescriptionState.patientId = patientId;
+
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-prescription-bottle"></i> Prescription</h1>
+                    <div class="action-stack">
+                        <button class="btn btn-success" onclick="generateOrdonnance()"><i class="fas fa-file-pdf"></i> Ordonnance PDF</button>
+                        <button class="btn btn-primary" onclick="sendToLab()"><i class="fas fa-flask"></i> Envoyer au laboratoire</button>
+                        <button class="btn btn-secondary" onclick="savePrescription()"><i class="fas fa-save"></i> Sauvegarder</button>
+                    </div>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;background:var(--light);border-radius:12px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <div>
+                        <h3 style="margin:0;">${escapeHtml(patient.full_name)}</h3>
+                        <div style="font-size:13px;color:var(--gray-dark);">🆔 #${patient.id} • ${escapeHtml(getGenderLabel(patient.gender))} • ${getPatientAgeYears(patient) || '—'} ans</div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span class="badge badge-info">En cours</span>
+                    </div>
+                </div>
+
+                <div style="background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-pills"></i> Médicaments</h4>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                        <select class="form-control" id="medicamentSelect" style="flex:2;min-width:150px;">
+                            <option value="">Choisir un médicament</option>
+                            ${prescriptionState.medicamentList.map(m => `
+                                <option value="${m.id}" data-stock="${m.stock}">${m.name} ${m.dosage} (${m.stock} unités)</option>
+                            `).join('')}
+                        </select>
+                        <input class="form-control" id="medicamentDosage" placeholder="Dosage" style="flex:1;min-width:80px;">
+                        <input class="form-control" id="medicamentFreq" placeholder="Fréquence" style="flex:1;min-width:80px;">
+                        <input class="form-control" id="medicamentDuree" placeholder="Durée" style="flex:1;min-width:80px;">
+                        <button class="btn btn-primary" onclick="addMedicament()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="medicamentList" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                </div>
+
+                <div style="background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-flask"></i> Examens complémentaires</h4>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                        <select class="form-control" id="examenSelect" style="flex:2;min-width:150px;">
+                            <option value="">Choisir un examen</option>
+                            ${prescriptionState.examenList.map(e => `<option value="${e}">${e}</option>`).join('')}
+                        </select>
+                        <input class="form-control" id="examenNotes" placeholder="Notes" style="flex:2;">
+                        <button class="btn btn-primary" onclick="addExamen()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="examenList" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                </div>
+
+                <div style="background:var(--light);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-notes-medical"></i> Actes médicaux</h4>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                        <select class="form-control" id="acteSelect" style="flex:2;min-width:150px;">
+                            <option value="">Choisir un acte</option>
+                            ${prescriptionState.acteList.map(a => `<option value="${a}">${a}</option>`).join('')}
+                        </select>
+                        <input class="form-control" id="acteNotes" placeholder="Notes" style="flex:2;">
+                        <button class="btn btn-primary" onclick="addActe()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="acteList" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                </div>
+            `;
+
+            renderMedicaments();
+            renderExamens();
+            renderActes();
+
+            document.getElementById('medicamentSelect').addEventListener('change', function() {
+                const selected = this.options[this.selectedIndex];
+                if (selected && selected.dataset.stock) {
+                    const stock = parseInt(selected.dataset.stock);
+                    if (stock < 5 && stock > 0) {
+                        showToast(`⚠️ Stock faible: ${stock} unités restantes`, 'warning');
+                    }
+                    if (stock === 0) {
+                        showToast('❌ Produit en rupture de stock!', 'error');
+                    }
+                }
+            });
+        }
+
+        function renderMedicaments() {
+            const container = document.getElementById('medicamentList');
+            if (!container) return;
+            if (!prescriptionState.medicaments.length) {
+                container.innerHTML = '<span style="color:var(--gray-dark);font-size:13px;">Aucun médicament prescrit</span>';
+                return;
+            }
+            container.innerHTML = prescriptionState.medicaments.map((m, i) => `
+                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--primary-light);padding:4px 10px;border-radius:999px;font-size:12px;">
+                    ${escapeHtml(m.name)} ${escapeHtml(m.dosage)} - ${escapeHtml(m.frequence)} - ${escapeHtml(m.duree)}
+                    <span style="cursor:pointer;color:var(--danger);" onclick="removeMedicament(${i})">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function renderExamens() {
+            const container = document.getElementById('examenList');
+            if (!container) return;
+            if (!prescriptionState.examens.length) {
+                container.innerHTML = '<span style="color:var(--gray-dark);font-size:13px;">Aucun examen prescrit</span>';
+                return;
+            }
+            container.innerHTML = prescriptionState.examens.map((e, i) => `
+                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--info-light);padding:4px 10px;border-radius:999px;font-size:12px;">
+                    ${escapeHtml(e.name)} ${e.notes ? '📝 ' + escapeHtml(e.notes) : ''}
+                    <span style="cursor:pointer;color:var(--danger);" onclick="removeExamen(${i})">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function renderActes() {
+            const container = document.getElementById('acteList');
+            if (!container) return;
+            if (!prescriptionState.actes.length) {
+                container.innerHTML = '<span style="color:var(--gray-dark);font-size:13px;">Aucun acte prescrit</span>';
+                return;
+            }
+            container.innerHTML = prescriptionState.actes.map((a, i) => `
+                <span style="display:inline-flex;align-items:center;gap:4px;background:var(--success-light);padding:4px 10px;border-radius:999px;font-size:12px;">
+                    ${escapeHtml(a.name)} ${a.notes ? '📝 ' + escapeHtml(a.notes) : ''}
+                    <span style="cursor:pointer;color:var(--danger);" onclick="removeActe(${i})">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function addMedicament() {
+            const select = document.getElementById('medicamentSelect');
+            const dosage = document.getElementById('medicamentDosage').value.trim();
+            const frequence = document.getElementById('medicamentFreq').value.trim();
+            const duree = document.getElementById('medicamentDuree').value.trim();
+
+            if (!select.value) return showToast('Sélectionnez un médicament', 'warning');
+
+            const med = prescriptionState.medicamentList.find(m => m.id === parseInt(select.value));
+            if (!med) return;
+
+            prescriptionState.medicaments.push({
+                id: med.id,
+                name: med.name,
+                dosage: dosage || med.dosage,
+                frequence: frequence || '2x/jour',
+                duree: duree || '7 jours'
+            });
+
+            document.getElementById('medicamentDosage').value = '';
+            document.getElementById('medicamentFreq').value = '';
+            document.getElementById('medicamentDuree').value = '';
+            select.value = '';
+
+            renderMedicaments();
+            showToast(`💊 ${med.name} ajouté`, 'success');
+        }
+
+        function removeMedicament(index) {
+            prescriptionState.medicaments.splice(index, 1);
+            renderMedicaments();
+        }
+
+        function addExamen() {
+            const select = document.getElementById('examenSelect');
+            const notes = document.getElementById('examenNotes').value.trim();
+
+            if (!select.value) return showToast('Sélectionnez un examen', 'warning');
+
+            prescriptionState.examens.push({
+                name: select.value,
+                notes: notes || 'À réaliser'
+            });
+
+            document.getElementById('examenNotes').value = '';
+            select.value = '';
+
+            renderExamens();
+            showToast(`🔬 ${select.value} ajouté`, 'success');
+        }
+
+        function removeExamen(index) {
+            prescriptionState.examens.splice(index, 1);
+            renderExamens();
+        }
+
+        function addActe() {
+            const select = document.getElementById('acteSelect');
+            const notes = document.getElementById('acteNotes').value.trim();
+
+            if (!select.value) return showToast('Sélectionnez un acte', 'warning');
+
+            prescriptionState.actes.push({
+                name: select.value,
+                notes: notes || 'À effectuer'
+            });
+
+            document.getElementById('acteNotes').value = '';
+            select.value = '';
+
+            renderActes();
+            showToast(`🩺 ${select.value} ajouté`, 'success');
+        }
+
+        function removeActe(index) {
+            prescriptionState.actes.splice(index, 1);
+            renderActes();
+        }
+
+        async function savePrescription() {
+            const patientId = consultationState.patientId;
+            if (!patientId) return showToast('Aucun patient sélectionné', 'warning');
+
+            showLoading();
+            try {
+                for (const med of prescriptionState.medicaments) {
+                    await api.post('/prescriptions', {
+                        patient_id: patientId,
+                        medication: med.name,
+                        dosage: med.dosage,
+                        frequency: med.frequence,
+                        duration: med.duree,
+                        status: 'active'
+                    });
+                }
+
+                for (const ex of prescriptionState.examens) {
+                    await api.post('/laboratory/tests', {
+                        patient_id: patientId,
+                        test_type: ex.name,
+                        notes: ex.notes,
+                        status: 'pending'
+                    });
+                }
+
+                for (const act of prescriptionState.actes) {
+                    await api.post('/care', {
+                        patient_id: patientId,
+                        care_type: act.name,
+                        description: act.notes,
+                        status: 'pending'
+                    });
+                }
+
+                showToast('Prescription sauvegardée', 'success');
+                prescriptionState.medicaments = [];
+                prescriptionState.examens = [];
+                prescriptionState.actes = [];
+                renderMedicaments();
+                renderExamens();
+                renderActes();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function sendToLab() {
+            const examens = prescriptionState.examens;
+            if (!examens.length) return showToast('Aucun examen à envoyer', 'warning');
+
+            if (!confirm(`Envoyer ${examens.length} examen(s) au laboratoire ?`)) return;
+
+            showLoading();
+            try {
+                const patientId = consultationState.patientId;
+                for (const ex of examens) {
+                    await api.post('/laboratory/tests', {
+                        patient_id: patientId,
+                        test_type: ex.name,
+                        notes: ex.notes + ' (Envoyé par le médecin)',
+                        status: 'pending'
+                    });
+                }
+                showToast(`✅ ${examens.length} examen(s) envoyé(s) au laboratoire`, 'success');
+                prescriptionState.examens = [];
+                renderExamens();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== GENERATE ORDONNANCE ====================
+        function generateOrdonnance() {
+            const patient = consultationState.patient;
+            if (!patient) return showToast('Aucun patient sélectionné', 'warning');
+
+            const medicaments = prescriptionState.medicaments;
+            const examens = prescriptionState.examens;
+            const actes = prescriptionState.actes;
+
+            if (!medicaments.length && !examens.length && !actes.length) {
+                return showToast('Aucune prescription à générer', 'warning');
+            }
+
+            const medicamentsHtml = medicaments.map(m => `
+                <tr>
+                    <td>${escapeHtml(m.name)}</td>
+                    <td>${escapeHtml(m.dosage)}</td>
+                    <td>${escapeHtml(m.frequence)}</td>
+                    <td>${escapeHtml(m.duree)}</td>
+                </tr>
+            `).join('');
+
+            const examensHtml = examens.map(e => `<li>${escapeHtml(e.name)} ${e.notes ? '— ' + escapeHtml(e.notes) : ''}</li>`).join('');
+            const actesHtml = actes.map(a => `<li>${escapeHtml(a.name)} ${a.notes ? '— ' + escapeHtml(a.notes) : ''}</li>`).join('');
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Ordonnance - I Hub</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body { font-family: 'Inter', Arial, sans-serif; margin: 0; padding: 20px; background: #f1f5f9; }
+                        .page { max-width: 210mm; margin: 0 auto; background: #fff; padding: 20mm; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+                        .header { text-align: center; border-bottom: 3px solid #0a5c7e; padding-bottom: 12px; margin-bottom: 20px; }
+                        .header h1 { color: #0a5c7e; font-size: 28px; margin: 0; }
+                        .header p { color: #64748b; font-size: 13px; margin: 4px 0; }
+                        .infos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
+                        .infos strong { color: #0a5c7e; }
+                        .section { margin: 20px 0; }
+                        .section h3 { color: #0a5c7e; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; font-size: 16px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                        table th { background: #0a5c7e; color: #fff; padding: 6px 10px; text-align: left; font-size: 12px; text-transform: uppercase; }
+                        table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
+                        ul { list-style: none; padding: 0; margin: 0; }
+                        ul li { padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+                        .footer { margin-top: 30px; padding-top: 16px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }
+                        .signature { font-size: 14px; font-style: italic; }
+                        .qrcode { width: 80px; height: 80px; background: #f1f5f9; border: 1px dashed #94a3b8; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #94a3b8; }
+                        @media print { body { background: #fff; padding: 0; } .page { box-shadow: none; padding: 15mm; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="page">
+                        <div class="header">
+                            <h1>🏥 I HUB</h1>
+                            <p>${CONFIG.HOSPITAL_ADDRESS || 'Hôpital I Hub'}</p>
+                            <p>📞 ${CONFIG.HOSPITAL_PHONE} • ✉️ ${CONFIG.HOSPITAL_EMAIL}</p>
+                        </div>
+
+                        <div class="infos">
+                            <div><strong>👨‍⚕️ Médecin:</strong> Dr. ${escapeHtml(currentUser?.name || '—')}</div>
+                            <div><strong>🧑‍🦰 Patient:</strong> ${escapeHtml(patient.full_name)}</div>
+                            <div><strong>📅 Date:</strong> ${new Date().toLocaleDateString('fr-FR')}</div>
+                            <div><strong>🆔 ID Patient:</strong> #${patient.id}</div>
+                            <div><strong>📅 Âge:</strong> ${getPatientAgeYears(patient) || '—'} ans</div>
+                            <div><strong>⚤ Sexe:</strong> ${escapeHtml(getGenderLabel(patient.gender))}</div>
+                        </div>
+
+                        ${medicaments.length ? `
+                        <div class="section">
+                            <h3>💊 Médicaments prescrits</h3>
+                            <table>
+                                <thead><tr><th>Nom</th><th>Dosage</th><th>Fréquence</th><th>Durée</th></tr></thead>
+                                <tbody>${medicamentsHtml}</tbody>
+                            </table>
+                        </div>
+                        ` : ''}
+
+                        ${examens.length ? `
+                        <div class="section">
+                            <h3>🔬 Examens complémentaires</h3>
+                            <ul>${examensHtml}</ul>
+                        </div>
+                        ` : ''}
+
+                        ${actes.length ? `
+                        <div class="section">
+                            <h3>🩺 Actes médicaux</h3>
+                            <ul>${actesHtml}</ul>
+                        </div>
+                        ` : ''}
+
+                        <div class="footer">
+                            <div class="signature">
+                                Signature du médecin:<br>
+                                <span style="font-size:18px;font-weight:600;font-family:'Brush Script MT',cursive;">Dr. ${escapeHtml(currentUser?.name || '—')}</span>
+                            </div>
+                            <div class="qrcode">QR Code</div>
+                        </div>
+                        <div style="text-align:center;margin-top:20px;font-size:11px;color:#94a3b8;">
+                            Document généré par I Hub — Toute modification est interdite
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const win = window.open('', '_blank', 'width=800,height=600');
+            if (!win) return showToast('Autorisez les popups pour générer l\'ordonnance.', 'warning');
+            win.document.write(html);
+            win.document.close();
+            showToast('📄 Ordonnance générée', 'success');
+        }
+
+        // ==================== PATIENTS ====================
+        async function loadPatients() {
+            try {
+                const allPatients = sortByDateDesc(await api.get('/patients'), 'created_at');
+                patientsCache = allPatients;
+                const admittedCount = patientsCache.filter(patient => patient.status === 'admitted').length;
+                const dischargedCount = patientsCache.filter(patient => patient.status === 'discharged').length;
+
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-users"></i> Patients</h1>
+                    </div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">Total patients</div><div class="value">${patientsCache.length}</div></div>
+                        <div class="insight-card"><div class="label">Hospitalisés</div><div class="value">${admittedCount}</div></div>
+                        <div class="insight-card"><div class="label">Sortis</div><div class="value">${dischargedCount}</div></div>
+                        <div class="insight-card"><div class="label">Actifs</div><div class="value">${patientsCache.length - admittedCount - dischargedCount}</div></div>
+                    </div>
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchPatient" placeholder="Rechercher par nom, téléphone ou email..." oninput="debouncedSearchPatients()">
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody id="patientsTableBody">${renderPatientRows(patientsCache)}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function renderPatientRows(patients) {
+            if (!patients.length) return '<tr><td colspan="6" style="text-align:center;">Aucun patient</td></tr>';
+            return patients.map(patient => `
+                <tr>
+                    <td><strong>#${patient.id}</strong></td>
+                    <td><strong>${escapeHtml(patient.full_name)}</strong>${patient.is_pregnant ? ' <span class="badge badge-warning">Femme enceinte</span>' : ''}<br><small style="color:var(--gray-dark);">${escapeHtml(getGenderLabel(patient.gender))} • ${escapeHtml(safeText(patient.blood_type))}</small></td>
+                    <td>${escapeHtml(safeText(patient.phone))}</td>
+                    <td>${escapeHtml(safeText(patient.email))}</td>
+                    <td><span class="badge badge-${getPatientStatusBadgeClass(patient.status)}">${escapeHtml(getPatientStatusLabel(patient.status))}</span></td>
+                    <td>
+                        <div class="action-stack">
+                            <button class="btn btn-info btn-sm" onclick="viewPatientDetails(${patient.id})"><i class="fas fa-id-card"></i> Fiche</button>
+                            <button class="btn btn-primary btn-sm" onclick="selectPatientForConsultation(${patient.id})"><i class="fas fa-stethoscope"></i> Consulter</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function debouncedSearchPatients() {
+            clearTimeout(patientSearchTimer);
+            patientSearchTimer = setTimeout(() => searchPatients(), 250);
+        }
+
+        async function searchPatients() {
+            const term = document.getElementById('searchPatient')?.value?.trim() || '';
+            const tbody = document.getElementById('patientsTableBody');
+            if (!tbody) return;
+            try {
+                const patients = term ? await api.get(`/patients?search=${encodeURIComponent(term)}`) : await api.get('/patients');
+                tbody.innerHTML = renderPatientRows(sortByDateDesc(patients, 'created_at'));
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function viewPatientDetails(id) {
+            showLoading();
+            try {
+                const [patient, appointments, prescriptions, labResults] = await Promise.all([
+                    api.get(`/patients/${id}`),
+                    api.get(`/patients/${id}/appointments`).catch(()=>[]),
+                    api.get(`/patients/${id}/prescriptions`).catch(()=>[]),
+                    api.get(`/patients/${id}/lab-results`).catch(()=>[])
+                ]);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="patientDetailsModal">
+                        <div class="modal-content" style="width:min(96vw,800px);max-width:800px;max-height:90vh;overflow-y:auto;">
+                            <div class="modal-header" style="padding:14px 18px;">
+                                <h3><i class="fas fa-user-circle"></i> Fiche patient</h3>
+                                <span class="close-modal" onclick="closeModal('patientDetailsModal')">&times;</span>
+                            </div>
+                            <div style="padding:20px;">
+                                <h2>${escapeHtml(patient.full_name)}</h2>
+                                <p><strong>ID:</strong> #${patient.id}</p>
+                                <p><strong>Genre:</strong> ${escapeHtml(getGenderLabel(patient.gender))}</p>
+                                <p><strong>Date de naissance:</strong> ${formatDate(patient.date_of_birth)}</p>
+                                <p><strong>Téléphone:</strong> ${escapeHtml(safeText(patient.phone))}</p>
+                                <p><strong>Email:</strong> ${escapeHtml(safeText(patient.email))}</p>
+                                <p><strong>Adresse:</strong> ${escapeHtml(safeText(patient.address))}</p>
+                                <p><strong>Statut:</strong> ${escapeHtml(getPatientStatusLabel(patient.status))}</p>
+                                ${patient.is_pregnant ? '<p><span class="badge badge-warning">Femme enceinte</span></p>' : ''}
+                                <h4>Prescriptions</h4>
+                                <ul>${prescriptions.map(p => `<li>${escapeHtml(p.medication)} - ${escapeHtml(p.dosage)} (${escapeHtml(p.status || 'En cours')})</li>`).join('')}</ul>
+                                <h4>Résultats d'analyses</h4>
+                                <ul>${labResults.map(r => `<li>${escapeHtml(r.test_type)}: ${escapeHtml(r.result || 'En attente')}</li>`).join('')}</ul>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== APPOINTMENTS ====================
+        async function loadAppointments() {
+            try {
+                appointmentsCache = sortByDateDesc(filterAppointmentsForCurrentRole(await api.get('/appointments')), 'date');
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-calendar-alt"></i> Rendez-vous</h1>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Patient</th><th>Date</th><th>Type</th><th>Durée</th><th>Statut</th></tr></thead>
+                            <tbody>
+                                ${appointmentsCache.map(a => `
+                                    <tr>
+                                        <td><strong>${escapeHtml(a.patient_name)}</strong></td>
+                                        <td>${new Date(a.date).toLocaleString('fr-FR')}</td>
+                                        <td>${escapeHtml(a.type)}</td>
+                                        <td>${a.duration} min</td>
+                                        <td><span class="badge badge-${a.status === 'scheduled' ? 'info' : a.status === 'completed' ? 'success' : 'danger'}">${a.status === 'scheduled' ? 'Planifié' : a.status === 'completed' ? 'Terminé' : 'Annulé'}</span></td>
+                                    </tr>
+                                `).join('')}
+                                ${appointmentsCache.length === 0 ? '<tr><td colspan="5" style="text-align:center;">Aucun rendez-vous</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // ==================== LABORATORY ====================
+        async function loadLaboratory() {
+            try {
+                const [tests, results] = await Promise.all([
+                    api.get('/laboratory/tests').catch(()=>[]),
+                    api.get('/laboratory/results').catch(()=>[])
+                ]);
+
+                const pendingTests = filterForCurrentDoctor(tests).filter(t => t.status !== 'completed');
+                const completedResults = filterForCurrentDoctor(results);
+
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-flask"></i> Laboratoire</h1>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div style="background:var(--light);border-radius:12px;padding:16px;box-shadow:var(--shadow);">
+                            <h4 style="margin:0 0 8px;">📋 Demandes en attente (${pendingTests.length})</h4>
+                            ${pendingTests.length ? pendingTests.slice(0, 10).map(t => `
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--gray);font-size:13px;">
+                                    <span>${escapeHtml(t.patient_name)} - ${escapeHtml(t.test_type)}</span>
+                                    <span class="badge badge-warning">En attente</span>
+                                </div>
+                            `).join('') : '<span style="color:var(--gray-dark);">Aucune demande en attente</span>'}
+                        </div>
+                        <div style="background:var(--light);border-radius:12px;padding:16px;box-shadow:var(--shadow);">
+                            <h4 style="margin:0 0 8px;">📄 Résultats disponibles (${completedResults.length})</h4>
+                            ${completedResults.length ? completedResults.slice(0, 10).map(r => `
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--gray);font-size:13px;">
+                                    <span>${escapeHtml(r.patient_name)} - ${escapeHtml(r.test_type)}</span>
+                                    <button class="btn btn-sm btn-info" onclick="viewTestResult(${r.id})">Voir</button>
+                                </div>
+                            `).join('') : '<span style="color:var(--gray-dark);">Aucun résultat disponible</span>'}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function viewTestResult(id) {
+            try {
+                const result = await api.get(`/laboratory/tests/${id}/result`);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="viewResultModal">
+                        <div class="modal-content" style="max-width:500px;">
+                            <div class="modal-header">
+                                <h3><i class="fas fa-file-alt"></i> Résultat</h3>
+                                <span class="close-modal" onclick="closeModal('viewResultModal')">&times;</span>
+                            </div>
+                            <div style="padding:16px;">
+                                <p><strong>Patient:</strong> ${escapeHtml(result.patient_name)}</p>
+                                <p><strong>Type:</strong> ${escapeHtml(result.test_type)}</p>
+                                <p><strong>Date:</strong> ${new Date(result.completed_date).toLocaleDateString()}</p>
+                                <h4>Résultat:</h4>
+                                <div style="background:var(--gray-light);padding:12px;border-radius:8px;margin:8px 0;">${escapeHtml(result.result)}</div>
+                                ${result.observations ? `<h4>Observations:</h4><div style="background:var(--gray-light);padding:12px;border-radius:8px;">${escapeHtml(result.observations)}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch(error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // ==================== CARE ====================
+        async function loadCare() {
+            try {
+                const [careLogs, followups] = await Promise.all([
+                    api.get('/care').catch(()=>[]),
+                    api.get('/workflow/followups').catch(()=>[])
+                ]);
+
+                const allCare = [
+                    ...(Array.isArray(careLogs) ? careLogs : []).map(c => ({ ...c, type: 'Soin', source: 'care' })),
+                    ...(Array.isArray(followups) ? followups : []).map(f => ({ ...f, type: 'Suivi', source: 'followup' }))
+                ].sort((a,b) => new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0));
+
+                const pending = allCare.filter(c => c.status !== 'completed' && c.status !== 'done' && c.status !== 'given');
+                const history = allCare.filter(c => c.status === 'completed' || c.status === 'done' || c.status === 'given');
+
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-heartbeat"></i> Soins</h1>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div style="background:var(--light);border-radius:12px;padding:16px;box-shadow:var(--shadow);">
+                            <h4 style="margin:0 0 8px;">📋 Soins à effectuer (${pending.length})</h4>
+                            ${pending.length ? pending.slice(0, 10).map(c => `
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--gray);font-size:13px;">
+                                    <span>${escapeHtml(c.patient_name)} - ${escapeHtml(c.care_type || c.type)}</span>
+                                    <span class="badge badge-warning">En attente</span>
+                                </div>
+                            `).join('') : '<span style="color:var(--gray-dark);">Aucun soin en attente</span>'}
+                        </div>
+                        <div style="background:var(--light);border-radius:12px;padding:16px;box-shadow:var(--shadow);">
+                            <h4 style="margin:0 0 8px;">📄 Historique des soins (${history.length})</h4>
+                            ${history.length ? history.slice(0, 10).map(c => `
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--gray);font-size:13px;">
+                                    <span>${escapeHtml(c.patient_name)} - ${escapeHtml(c.care_type || c.type)}</span>
+                                    <span class="badge badge-success">Effectué</span>
+                                </div>
+                            `).join('') : '<span style="color:var(--gray-dark);">Aucun historique</span>'}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // ==================== REPORTS ====================
+        async function loadReports() {
+            try {
+                const [patients, appointments, prescriptions, care] = await Promise.all([
+                    api.get('/patients').catch(()=>[]),
+                    api.get('/appointments').catch(()=>[]),
+                    api.get('/prescriptions').catch(()=>[]),
+                    api.get('/care').catch(()=>[])
+                ]);
+
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="page-header">
+                        <h1><i class="fas fa-chart-bar"></i> Rapports</h1>
+                        <button class="btn btn-primary" onclick="exportReportPDF()"><i class="fas fa-file-pdf"></i> Exporter PDF</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+                        <div style="background:var(--light);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);">
+                            <div style="font-size:28px;font-weight:700;color:var(--primary);">${patients.length}</div>
+                            <div style="font-size:12px;color:var(--gray-dark);">Patients</div>
+                        </div>
+                        <div style="background:var(--light);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);">
+                            <div style="font-size:28px;font-weight:700;color:var(--primary);">${appointments.length}</div>
+                            <div style="font-size:12px;color:var(--gray-dark);">Rendez-vous</div>
+                        </div>
+                        <div style="background:var(--light);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);">
+                            <div style="font-size:28px;font-weight:700;color:var(--primary);">${prescriptions.length}</div>
+                            <div style="font-size:12px;color:var(--gray-dark);">Prescriptions</div>
+                        </div>
+                        <div style="background:var(--light);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);">
+                            <div style="font-size:28px;font-weight:700;color:var(--primary);">${care.length}</div>
+                            <div style="font-size:12px;color:var(--gray-dark);">Soins</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function exportReportPDF() {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups.', 'warning');
+            const content = document.getElementById('mainContent');
+            printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>Rapport ${CONFIG.APP_NAME}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 40px; }
+                    h1 { color: #0a5c7e; }
+                    .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin: 20px 0; }
+                    .stat { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+                    .stat .value { font-size: 28px; font-weight: 700; color: #0a5c7e; }
+                    .stat .label { font-size: 12px; color: #64748b; }
+                    @media print { body { padding: 20px; } }
+                </style></head><body>
+                <h1>Rapport ${CONFIG.APP_NAME}</h1>
+                <p>Généré le ${new Date().toLocaleString('fr-FR')}</p>
+                ${content.innerHTML}
+                </body></html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); }, 500);
+        }
+
+        // ==================== AI ASSISTANT ====================
+        async function loadAIAssistant() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-brain"></i> Assistance IA médicale</h1>
+                </div>
+                <div class="ai-grid">
+                    <div class="ai-panel">
+                        <h4 style="margin:0 0 8px;">Résumé patient</h4>
+                        <select class="form-control" id="aiPatientId">
+                            <option value="">Sélectionner un patient</option>
+                            ${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}
+                        </select>
+                        <button class="btn btn-primary" style="margin-top:8px;" onclick="summarizePatient()"><i class="fas fa-notes-medical"></i> Générer</button>
+                    </div>
+                    <div class="ai-panel">
+                        <h4 style="margin:0 0 8px;">Aide à la décision</h4>
+                        <textarea class="form-control" id="clinicalPrompt" rows="4" placeholder="Symptômes, constantes, contexte clinique..."></textarea>
+                        <button class="btn btn-primary" style="margin-top:8px;" onclick="askClinicalDecision()"><i class="fas fa-stethoscope"></i> Analyser</button>
+                    </div>
+                </div>
+                <div id="aiOutput"></div>
+            `;
+        }
+
+        async function summarizePatient() {
+            const patientId = document.getElementById('aiPatientId')?.value;
+            if (!patientId) return showToast('Sélectionnez un patient', 'warning');
+            showLoading();
+            try {
+                const result = await api.post('/ai/patient-summary', { patient_id: patientId });
+                document.getElementById('aiOutput').innerHTML = `
+                    <div class="ai-result">
+                        <h4><i class="fas fa-brain"></i> Résumé IA</h4>
+                        <pre>${escapeHtml(result.summary || result.message || 'Aucune réponse')}</pre>
+                        <div class="ai-disclaimer">Assistant médical — validation clinique obligatoire</div>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function askClinicalDecision() {
+            const prompt = sanitizeInput(document.getElementById('clinicalPrompt')?.value || '');
+            if (prompt.length < 10) return showToast('Décrivez le contexte clinique.', 'warning');
+            showLoading();
+            try {
+                const result = await api.post('/ai/clinical-decision', { context: prompt });
+                document.getElementById('aiOutput').innerHTML = `
+                    <div class="ai-result">
+                        <h4><i class="fas fa-brain"></i> Aide à la décision</h4>
+                        <pre>${escapeHtml(result.analysis || result.message || 'Aucune réponse')}</pre>
+                        <div class="ai-disclaimer">Assistant médical — validation clinique obligatoire</div>
+                    </div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== LOAD CIM10 DATA ====================
+        async function loadCIM10Data() {
+            try {
+                const response = await fetch('CIM10.json');
+                if (!response.ok) throw new Error('Fichier CIM10.json introuvable');
+                cim10Data = await response.json();
+                console.log(`✅ CIM10 chargé: ${cim10Data.length} diagnostics`);
+            } catch (error) {
+                console.warn('⚠️ CIM10 non chargé, utilisation de la liste intégrée');
+                cim10Data = [
+                    { code: 'A00', label: 'Choléra' },
+                    { code: 'A01', label: 'Fièvre typhoïde' },
+                    { code: 'A09', label: 'Gastro-entérite infectieuse' },
+                    { code: 'A15', label: 'Tuberculose respiratoire' },
+                    { code: 'B00', label: 'Herpès' },
+                    { code: 'B01', label: 'Varicelle' },
+                    { code: 'B02', label: 'Zona' },
+                    { code: 'B05', label: 'Rougeole' },
+                    { code: 'B06', label: 'Rubéole' },
+                    { code: 'B20', label: 'VIH' },
+                    { code: 'C00', label: 'Cancer de la lèvre' },
+                    { code: 'C50', label: 'Cancer du sein' },
+                    { code: 'C61', label: 'Cancer de la prostate' },
+                    { code: 'D50', label: 'Anémie ferriprive' },
+                    { code: 'E10', label: 'Diabète type 1' },
+                    { code: 'E11', label: 'Diabète type 2' },
+                    { code: 'E66', label: 'Obésité' },
+                    { code: 'F32', label: 'Dépression' },
+                    { code: 'G40', label: 'Épilepsie' },
+                    { code: 'G43', label: 'Migraine' },
+                    { code: 'I10', label: 'Hypertension' },
+                    { code: 'I21', label: 'Infarctus du myocarde' },
+                    { code: 'I50', label: 'Insuffisance cardiaque' },
+                    { code: 'J45', label: 'Asthme' },
+                    { code: 'J46', label: 'État de mal asthmatique' },
+                    { code: 'K21', label: 'RGO' },
+                    { code: 'K29', label: 'Gastrite' },
+                    { code: 'M54', label: 'Lombalgie' },
+                    { code: 'N18', label: 'Insuffisance rénale chronique' },
+                    { code: 'R10', label: 'Douleur abdominale' },
+                    { code: 'R50', label: 'Fièvre' },
+                    { code: 'R51', label: 'Céphalée' }
+                ];
+            }
+        }
+
+        // ==================== LOGOUT ====================
+        async function logout() {
+            try {
+                await fetch(`${CONFIG.API_URL}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (error) {}
+            SecureStorage.clear();
+            currentUser = null;
+            window.location.href = 'index.html';
+        }
+
+        // ==================== INITIALIZATION ====================
+        async function init() {
+            api = new APIService(CONFIG.API_URL);
+
+            const token = SecureStorage.get('token');
+            const savedUser = SecureStorage.get('user');
+
+            if (token && savedUser) {
+                currentUser = savedUser;
+                await loadCIM10Data();
+                loadDashboard();
+            } else {
+                window.location.href = 'index.html';
+            }
+
+            // Exposer les fonctions globales
+            window.toggleSidebar = toggleSidebar;
+            window.closeSidebar = closeSidebar;
+            window.closeModal = closeModal;
+            window.logout = logout;
+            window.loadPage = loadPage;
+            window.showToast = showToast;
+            window.showLoading = showLoading;
+            window.hideLoading = hideLoading;
+            window.formatDate = formatDate;
+            window.escapeHtml = escapeHtml;
+            window.buildTableSection = buildTableSection;
+
+            window.loadWaitingRoom = loadWaitingRoom;
+            window.filterWaitingRoom = filterWaitingRoom;
+            window.callPatient = callPatient;
+            window.openPatientRecord = openPatientRecord;
+
+            window.loadConsultation = loadConsultation;
+            window.filterCIM10 = filterCIM10;
+            window.selectCIM10 = selectCIM10;
+            window.addDiagnostic = addDiagnostic;
+            window.removeDiagnostic = removeDiagnostic;
+            window.saveConsultation = saveConsultation;
+            window.endConsultation = endConsultation;
+            window.goToPrescription = goToPrescription;
+            window.openPatientSearch = openPatientSearch;
+            window.filterPatientSearch = filterPatientSearch;
+            window.selectPatientForConsultation = selectPatientForConsultation;
+
+            window.loadPrescription = loadPrescription;
+            window.addMedicament = addMedicament;
+            window.removeMedicament = removeMedicament;
+            window.addExamen = addExamen;
+            window.removeExamen = removeExamen;
+            window.addActe = addActe;
+            window.removeActe = removeActe;
+            window.savePrescription = savePrescription;
+            window.sendToLab = sendToLab;
+            window.generateOrdonnance = generateOrdonnance;
+
+            window.viewPatientDetails = viewPatientDetails;
+            window.searchPatients = searchPatients;
+            window.debouncedSearchPatients = debouncedSearchPatients;
+
+            window.viewTestResult = viewTestResult;
+            window.exportReportPDF = exportReportPDF;
+
+            window.summarizePatient = summarizePatient;
+            window.askClinicalDecision = askClinicalDecision;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

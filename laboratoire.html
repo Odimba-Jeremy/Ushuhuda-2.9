@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Hub — Laboratoire</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="logo.jpg">
+    <style>
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .param-item { background: var(--gray-100); padding: 8px 12px; border-radius: 6px; }
+        .param-item label { display: block; font-size: 11px; color: var(--gray-500); font-weight: 600; text-transform: uppercase; }
+        .param-item input { width: 100%; border: none; background: transparent; font-weight: 600; padding: 4px 0; font-size: 14px; }
+        .param-item input:focus { outline: none; border-bottom: 2px solid var(--primary); }
+
+        .stock-alert { background: #fee2e2; color: #dc2626; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .stock-warning { background: #ffedd5; color: #d97706; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .stock-ok { background: #dcfce7; color: #16a34a; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+
+        .anapath-protocol {
+            background: var(--gray-100);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        .anapath-protocol h4 { margin: 0 0 8px; color: var(--primary-dark); }
+        .anapath-protocol textarea { width: 100%; border: 1px solid var(--gray-300); border-radius: 6px; padding: 8px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 60px; }
+        .anapath-protocol textarea:focus { outline: none; border-color: var(--primary); }
+
+        .section-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; border-bottom: 2px solid var(--gray-200); }
+        .section-tab { padding: 8px 16px; border: none; background: transparent; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--gray-500); border-bottom: 3px solid transparent; transition: var(--transition); }
+        .section-tab:hover { color: var(--ink); }
+        .section-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOADING OVERLAY ===== -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <img src="logo.jpg" alt="I Hub" class="loading-logo">
+            <div class="loading-pulse"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== MOBILE MENU BUTTON ===== -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Ouvrir le menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ===== SIDEBAR OVERLAY ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <img src="logo.jpg" alt="I Hub" style="width:48px;height:48px;border-radius:12px;object-fit:contain;">
+                <div>
+                    <h2 style="font-size:20px;margin:0;">I Hub</h2>
+                    <p id="userInfo" style="font-size:11px;margin:4px 0 0;">Chargement...</p>
+                </div>
+            </div>
+        </div>
+        <div class="nav-menu" id="navMenu"></div>
+        <div class="sidebar-footer" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.1);">
+            <button class="btn btn-danger btn-sm btn-full" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content" id="mainContent">
+        <div id="pageContent"></div>
+    </main>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            API_URL: 'https://jokair.onrender.com/api',
+            APP_NAME: 'I-Hub',
+            HOSPITAL_NAME: 'I Hub',
+            HOSPITAL_PHONE: '+243 974 336 700',
+            HOSPITAL_EMAIL: 'jeremyodimba322@gmail.com',
+            CURRENCY: 'Fc'
+        };
+
+        // ==================== STORAGE ====================
+        class Storage {
+            static get(k) { try { const s = sessionStorage.getItem(k); if (s !== null) return JSON.parse(s); const l = localStorage.getItem(k); return l ? JSON.parse(l) : null; } catch { return null; } }
+            static set(k, v) { sessionStorage.setItem(k, JSON.stringify(v)); localStorage.setItem(k, JSON.stringify(v)); }
+            static clear() { sessionStorage.clear(); localStorage.clear(); }
+        }
+
+        // ==================== API ====================
+        class API {
+            constructor(url) { this.url = url; }
+            async request(endpoint, options = {}) {
+                const token = Storage.get('token');
+                const headers = { ...options.headers };
+                if (!(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                try {
+                    const res = await fetch(`${this.url}${endpoint}`, { ...options, headers, credentials: 'include' });
+                    if (res.status === 401) { this.logout(); throw new Error('Session expirée'); }
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || data.message || 'Erreur');
+                    return data;
+                } catch (e) { throw e; }
+            }
+            get(e) { return this.request(e, { method: 'GET' }); }
+            post(e, b) { return this.request(e, { method: 'POST', body: JSON.stringify(b) }); }
+            put(e, b) { return this.request(e, { method: 'PUT', body: JSON.stringify(b) }); }
+            patch(e, b) { return this.request(e, { method: 'PATCH', body: JSON.stringify(b) }); }
+            delete(e) { return this.request(e, { method: 'DELETE' }); }
+            logout() { Storage.clear(); window.location.href = 'index.html'; }
+        }
+
+        let api = null, currentUser = null;
+        let patientsCache = [], testsCache = [], resultsCache = [], stockCache = [], prelevementsCache = [];
+        let anapathDemandes = [];
+
+        // ==================== HELPERS ====================
+        function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+        function showToast(msg, type = 'info') {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+            t.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+        function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        function sanitizeInput(t) { if (!t) return ''; return String(t).replace(/[<>`]/g, '').trim(); }
+        function safeText(v, f = '—') { return v === null || v === undefined || v === '' ? f : v; }
+        function formatDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('fr-FR'); } catch { return d; } }
+        function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('fr-FR'); } catch { return d; } }
+        function formatMoney(v) { const a = Number(v || 0); return `${a.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${CONFIG.CURRENCY}`; }
+        function getRoleLabel(r) { const roles = { super_admin: 'Admin', laboratoire: 'Laboratoire', docteur: 'Médecin' }; return roles[r] || r; }
+        function getGreetingMessage() { const h = new Date().getHours(); if (h < 12) return 'Bonjour'; if (h < 18) return 'Bon après-midi'; return 'Bonsoir'; }
+        function formatShortTime() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+        function sortByDateDesc(arr, key = 'created_at') { return [...(arr || [])].sort((a, b) => new Date(b?.[key] || 0) - new Date(a?.[key] || 0)); }
+        function closeModal(id) { const m = document.getElementById(id); if (m) m.remove(); }
+        function closeSidebar() { document.getElementById('sidebar')?.classList.remove('mobile-open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+        function toggleSidebar() { const s = document.getElementById('sidebar'); const o = document.getElementById('sidebarOverlay'); if (!s || !o) return; s.classList.toggle('mobile-open'); o.classList.toggle('active', s.classList.contains('mobile-open')); }
+
+        function getCurrentRole() { return currentUser?.role || ''; }
+        function isAdmin() { return getCurrentRole() === 'super_admin'; }
+        function canAccessPage(id) { if (isAdmin()) return true; return (ROLE_PAGE_ACCESS[getCurrentRole()] || []).includes(id); }
+
+        // ==================== ROLE ACCESS ====================
+        const ROLE_PAGE_ACCESS = {
+            super_admin: ['dashboard', 'demandes', 'biologie', 'anapath', 'stock', 'rapports'],
+            laboratoire: ['dashboard', 'demandes', 'biologie', 'anapath', 'stock', 'rapports']
+        };
+
+        // ==================== PARAMÈTRES EXAMENS ====================
+        const EXAM_PARAMS = {
+            'Hémogramme': [
+                { name: 'GB', label: 'Globules blancs (G/L)', unit: 'G/L' },
+                { name: 'GR', label: 'Globules rouges (T/L)', unit: 'T/L' },
+                { name: 'Hb', label: 'Hémoglobine (g/dL)', unit: 'g/dL' },
+                { name: 'Ht', label: 'Hématocrite (%)', unit: '%' },
+                { name: 'VGM', label: 'VGM (fL)', unit: 'fL' },
+                { name: 'TCMH', label: 'TCMH (pg)', unit: 'pg' },
+                { name: 'CCMH', label: 'CCMH (g/dL)', unit: 'g/dL' },
+                { name: 'Plaquettes', label: 'Plaquettes (G/L)', unit: 'G/L' }
+            ],
+            'Bilan hépatique': [
+                { name: 'ALAT', label: 'ALAT (U/L)', unit: 'U/L' },
+                { name: 'ASAT', label: 'ASAT (U/L)', unit: 'U/L' },
+                { name: 'GGT', label: 'Gamma-GT (U/L)', unit: 'U/L' },
+                { name: 'PAL', label: 'Phosphatases alcalines (U/L)', unit: 'U/L' },
+                { name: 'Bilirubine_T', label: 'Bilirubine totale (mg/dL)', unit: 'mg/dL' },
+                { name: 'Bilirubine_D', label: 'Bilirubine directe (mg/dL)', unit: 'mg/dL' }
+            ],
+            'Bilan rénal': [
+                { name: 'Uree', label: 'Urée (g/L)', unit: 'g/L' },
+                { name: 'Creatinine', label: 'Créatinine (mg/L)', unit: 'mg/L' },
+                { name: 'Acide_urique', label: 'Acide urique (mg/L)', unit: 'mg/L' }
+            ],
+            'Bilan lipidique': [
+                { name: 'Cholest_total', label: 'Cholestérol total (g/L)', unit: 'g/L' },
+                { name: 'Triglycerides', label: 'Triglycérides (g/L)', unit: 'g/L' },
+                { name: 'HDL', label: 'HDL-Cholestérol (g/L)', unit: 'g/L' },
+                { name: 'LDL', label: 'LDL-Cholestérol (g/L)', unit: 'g/L' }
+            ],
+            'Analyse d\'urine': [
+                { name: 'pH', label: 'pH', unit: '' },
+                { name: 'Densite', label: 'Densité', unit: '' },
+                { name: 'Proteines', label: 'Protéines (g/L)', unit: 'g/L' },
+                { name: 'Glucose', label: 'Glucose (mmol/L)', unit: 'mmol/L' },
+                { name: 'Cetones', label: 'Cétones', unit: '' },
+                { name: 'Nitrites', label: 'Nitrites', unit: '' },
+                { name: 'Leucocytes', label: 'Leucocytes (/µL)', unit: '/µL' },
+                { name: 'Hematies', label: 'Hématies (/µL)', unit: '/µL' }
+            ],
+            'Autre': []
+        };
+
+        // ==================== NAVIGATION ====================
+        function buildNav() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord' },
+                { id: 'demandes', icon: 'fa-clipboard-list', label: 'Demandes' },
+                { id: 'biologie', icon: 'fa-microscope', label: 'Biologie' },
+                { id: 'anapath', icon: 'fa-file-medical', label: 'Anapath' },
+                { id: 'stock', icon: 'fa-boxes', label: 'Stock' },
+                { id: 'rapports', icon: 'fa-chart-bar', label: 'Rapports' }
+            ];
+            const allowed = items.filter(i => canAccessPage(i.id));
+            menu.innerHTML = allowed.map(i => `<div class="nav-item" data-page="${i.id}" onclick="loadPage('${i.id}')"><i class="fas ${i.icon}"></i><span>${i.label}</span></div>`).join('');
+        }
+
+        // ==================== PAGE LOADER ====================
+        function loadPage(id) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const active = document.querySelector(`.nav-item[data-page="${id}"]`);
+            if (active) active.classList.add('active');
+            showLoading();
+            setTimeout(async () => {
+                try {
+                    const c = document.getElementById('pageContent');
+                    switch (id) {
+                        case 'dashboard': await dashboard(c); break;
+                        case 'demandes': await demandesPage(c); break;
+                        case 'biologie': await biologiePage(c); break;
+                        case 'anapath': await anapathPage(c); break;
+                        case 'stock': await stockPage(c); break;
+                        case 'rapports': await rapportsPage(c); break;
+                        default: c.innerHTML = '<div class="empty-state"><i class="fas fa-file"></i><p>Page en construction</p></div>';
+                    }
+                } catch (e) { showToast(e.message || 'Erreur', 'error'); }
+                hideLoading();
+            }, 200);
+        }
+
+        // ==================== DASHBOARD ====================
+        async function dashboard(c) {
+            try {
+                const [patients, tests, results, stock] = await Promise.all([
+                    api.get('/patients').catch(() => []),
+                    api.get('/laboratory/tests').catch(() => []),
+                    api.get('/laboratory/results').catch(() => []),
+                    api.get('/laboratory/stock').catch(() => [])
+                ]);
+                patientsCache = patients;
+                testsCache = tests;
+                resultsCache = results;
+                stockCache = stock;
+
+                const pending = tests.filter(t => t.status === 'pending' || t.status === 'preleve').length;
+                const completed = tests.filter(t => t.status === 'completed').length;
+                const lowStock = stock.filter(s => Number(s.quantity) <= Number(s.threshold || 0) && Number(s.quantity) > 0).length;
+                const outOfStock = stock.filter(s => Number(s.quantity) === 0).length;
+                const now = new Date();
+                const greeting = getGreetingMessage();
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1><span class="badge badge-info"><i class="far fa-calendar"></i> ${now.toLocaleDateString('fr-FR')}</span></div>
+                    <div class="dashboard-greeting-card"><div class="dashboard-greeting-copy"><h2>${greeting}, ${escapeHtml(currentUser?.name || 'Laborantin')}</h2><p style="color:var(--gray-500);">Résumé du laboratoire</p></div><div class="dashboard-time-card"><span>Heure</span><strong>${formatShortTime()}</strong></div></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-clock"></i></div><div class="stat-value">${pending}</div><div class="stat-label">En attente</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-check-circle"></i></div><div class="stat-value">${completed}</div><div class="stat-label">Terminées</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-box"></i></div><div class="stat-value">${stock.length}</div><div class="stat-label">Produits en stock</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-value">${lowStock + outOfStock}</div><div class="stat-label">Alertes stock</div></div>
+                    </div>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card"><h3><i class="fas fa-flask"></i> Dernières demandes</h3>${pending ? `<div class="table-container"><table class="data-table"><thead><tr><th>Patient</th><th>Type</th><th>Date</th></tr></thead><tbody>${tests.filter(t => t.status === 'pending' || t.status === 'preleve').slice(0, 5).map(t => `<tr><td><strong>${escapeHtml(t.patient_name)}</strong></td><td>${escapeHtml(t.test_type)}</td><td>${formatDate(t.request_date)}</td></tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--gray-500);">Aucune demande en attente</p>'}</div>
+                        <div class="dashboard-card"><h3><i class="fas fa-microscope"></i> Derniers résultats</h3>${results.length ? `<div class="table-container"><table class="data-table"><thead><tr><th>Patient</th><th>Type</th><th>Date</th></tr></thead><tbody>${results.slice(0, 5).map(r => `<tr><td><strong>${escapeHtml(r.patient_name)}</strong></td><td>${escapeHtml(r.test_type)}</td><td>${formatDate(r.completed_date)}</td></tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--gray-500);">Aucun résultat</p>'}</div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); c.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p></div>`; }
+        }
+
+        // ==================== DEMANDES ====================
+        async function demandesPage(c) {
+            try {
+                const tests = await api.get('/laboratory/tests').catch(() => []);
+                testsCache = tests;
+                const pending = tests.filter(t => t.status === 'pending' || t.status === 'preleve');
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-clipboard-list"></i> Demandes</h1><button class="btn btn-primary" onclick="showDemandeModal()"><i class="fas fa-plus"></i> Nouvelle demande</button></div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">En attente</div><div class="value">${pending.length}</div></div>
+                        <div class="insight-card"><div class="label">Prélevés</div><div class="value">${tests.filter(t => t.status === 'preleve').length}</div></div>
+                        <div class="insight-card"><div class="label">Total</div><div class="value">${tests.length}</div></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>N°</th><th>Patient</th><th>Type</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody>${tests.length ? tests.map(t => `
+                                <tr>
+                                    <td><strong>#${t.id}</strong></td>
+                                    <td><strong>${escapeHtml(t.patient_name)}</strong></td>
+                                    <td>${escapeHtml(t.test_type)}</td>
+                                    <td>${formatDate(t.request_date)}</td>
+                                    <td><span class="badge badge-${t.status === 'completed' ? 'success' : t.status === 'preleve' ? 'info' : 'warning'}">${t.status === 'completed' ? 'Terminé' : t.status === 'preleve' ? 'Prélevé' : 'En attente'}</span></td>
+                                    <td>
+                                        ${t.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="preleverEchantillon(${t.id})"><i class="fas fa-syringe"></i> Prélever</button>` : ''}
+                                        ${t.status === 'preleve' ? `<button class="btn btn-sm btn-success" onclick="saisirResultatsBiologie(${t.id})"><i class="fas fa-flask"></i> Résultats</button>` : ''}
+                                        ${t.status === 'completed' ? `<button class="btn btn-sm btn-info" onclick="voirResultat(${t.id})"><i class="fas fa-eye"></i> Voir</button><button class="btn btn-sm btn-secondary" onclick="imprimerResultat(${t.id})"><i class="fas fa-print"></i> Imprimer</button>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="6" style="text-align:center;">Aucune demande</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== DEMANDE MODAL ====================
+        function showDemandeModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="demandeModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-plus"></i> Nouvelle demande</h3><span class="close-modal" onclick="closeModal('demandeModal')">&times;</span></div>
+                        <form onsubmit="createDemande(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Patient *</label>
+                                <select class="form-control" id="demandePatientId" required>
+                                    <option value="">Sélectionner</option>
+                                    ${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Type d'examen *</label>
+                                <select class="form-control" id="demandeType" required>
+                                    <option value="">Sélectionner</option>
+                                    <option value="Hémogramme">Hémogramme</option>
+                                    <option value="Bilan hépatique">Bilan hépatique</option>
+                                    <option value="Bilan rénal">Bilan rénal</option>
+                                    <option value="Bilan lipidique">Bilan lipidique</option>
+                                    <option value="Analyse d'urine">Analyse d'urine</option>
+                                    <option value="Anapath - Histologie">Anapath - Histologie</option>
+                                    <option value="Anapath - Cytologie">Anapath - Cytologie</option>
+                                    <option value="Autre">Autre</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Notes / Prescription</label>
+                                <textarea class="form-control" id="demandeNotes" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer la demande</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createDemande(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const patientId = document.getElementById('demandePatientId').value;
+                const testType = document.getElementById('demandeType').value;
+                const notes = sanitizeInput(document.getElementById('demandeNotes').value);
+
+                if (!patientId || !testType) throw new Error('Patient et type requis');
+
+                await api.post('/laboratory/tests', {
+                    patient_id: patientId,
+                    test_type: testType,
+                    notes: notes,
+                    status: 'pending'
+                });
+                showToast('Demande créée', 'success');
+                closeModal('demandeModal');
+                loadPage('demandes');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== PRELEVEMENT ====================
+        async function preleverEchantillon(testId) {
+            const test = testsCache.find(t => t.id === testId);
+            if (!test) return showToast('Analyse introuvable', 'error');
+
+            const numPrelevement = `PR-${new Date().toISOString().slice(0,10)}-${String(testId).padStart(4,'0')}`;
+
+            showLoading();
+            try {
+                await api.patch(`/laboratory/tests/${testId}`, {
+                    status: 'preleve',
+                    num_prelevement: numPrelevement,
+                    preleve_at: new Date().toISOString()
+                });
+                await api.post('/laboratory/prelevements', {
+                    test_id: testId,
+                    patient_id: test.patient_id,
+                    num_prelevement: numPrelevement,
+                    type: test.test_type
+                });
+                showToast(`✅ Échantillon prélevé - N° ${numPrelevement}`, 'success');
+                loadPage('demandes');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== BIOLOGIE ====================
+        async function biologiePage(c) {
+            try {
+                const tests = await api.get('/laboratory/tests').catch(() => []);
+                testsCache = tests;
+                const biologieTests = tests.filter(t => t.status === 'preleve' || t.status === 'pending');
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-microscope"></i> Biologie</h1></div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Patient</th><th>Type</th><th>N° Prélèvement</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody>${biologieTests.map(t => `
+                                <tr>
+                                    <td><strong>${escapeHtml(t.patient_name)}</strong></td>
+                                    <td>${escapeHtml(t.test_type)}</td>
+                                    <td>${t.num_prelevement || '—'}</td>
+                                    <td><span class="badge badge-${t.status === 'preleve' ? 'info' : 'warning'}">${t.status === 'preleve' ? 'Prélevé' : 'En attente'}</span></td>
+                                    <td>
+                                        ${t.status === 'preleve' ? `<button class="btn btn-sm btn-success" onclick="saisirResultatsBiologie(${t.id})"><i class="fas fa-flask"></i> Saisir résultats</button>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== SAISIE RESULTATS BIOLOGIE ====================
+        function saisirResultatsBiologie(testId) {
+            const test = testsCache.find(t => t.id === testId);
+            if (!test) return showToast('Analyse introuvable', 'error');
+
+            const params = EXAM_PARAMS[test.test_type] || EXAM_PARAMS['Autre'];
+            const hasParams = params && params.length > 0;
+
+            let paramsHtml = '';
+            if (hasParams) {
+                paramsHtml = params.map(p => `
+                    <div class="param-item">
+                        <label>${p.label}</label>
+                        <input type="text" id="param_${p.name}" placeholder="—" data-param="${p.name}">
+                    </div>
+                `).join('');
+            }
+
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="resultatBiologieModal" style="max-width:700px;">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-flask"></i> Résultats - ${escapeHtml(test.test_type)}</h3><span class="close-modal" onclick="closeModal('resultatBiologieModal')">&times;</span></div>
+                        <form onsubmit="saveResultatsBiologie(event, ${testId})" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Patient: <strong>${escapeHtml(test.patient_name)}</strong></label></div>
+                            <div class="form-group"><label class="form-label">N° Prélèvement: <strong>${test.num_prelevement || '—'}</strong></label></div>
+                            ${hasParams ? `<div class="param-grid">${paramsHtml}</div>` : ''}
+                            <div class="form-group" style="margin-top:12px;">
+                                <label class="form-label">Commentaires / Observations</label>
+                                <textarea class="form-control" id="resultatCommentaires" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-full"><i class="fas fa-save"></i> Enregistrer les résultats</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function saveResultatsBiologie(e, testId) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const test = testsCache.find(t => t.id === testId);
+                if (!test) throw new Error('Analyse introuvable');
+
+                const params = EXAM_PARAMS[test.test_type] || EXAM_PARAMS['Autre'];
+                let resultats = {};
+                if (params && params.length > 0) {
+                    params.forEach(p => {
+                        const val = document.getElementById(`param_${p.name}`)?.value || '';
+                        if (val) resultats[p.name] = val;
+                    });
+                }
+
+                const commentaires = sanitizeInput(document.getElementById('resultatCommentaires').value);
+
+                await api.put(`/laboratory/tests/${testId}/result`, {
+                    result: JSON.stringify(resultats),
+                    observations: commentaires,
+                    status: 'completed',
+                    completed_date: new Date().toISOString()
+                });
+
+                // Lier au dossier patient
+                await api.post(`/patients/${test.patient_id}/lab-results`, {
+                    test_id: testId,
+                    test_type: test.test_type,
+                    result: JSON.stringify(resultats),
+                    observations: commentaires
+                });
+
+                showToast('✅ Résultats enregistrés et liés au dossier patient', 'success');
+                closeModal('resultatBiologieModal');
+                loadPage('demandes');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== ANAPATH ====================
+        async function anapathPage(c) {
+            try {
+                const anapathTests = testsCache.filter(t =>
+                    t.test_type && t.test_type.includes('Anapath')
+                );
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-file-medical"></i> Anatomie Pathologie</h1></div>
+                    <div class="section-tabs">
+                        <button class="section-tab active" onclick="switchAnapathTab('demandes')">Bons de demande</button>
+                        <button class="section-tab" onclick="switchAnapathTab('protocols')">Protocoles</button>
+                    </div>
+                    <div id="anapathContent">
+                        <div class="panel active" id="panel-demandes">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+                                    <tbody>${anapathTests.map(t => `
+                                        <tr>
+                                            <td><strong>${escapeHtml(t.patient_name)}</strong></td>
+                                            <td>${escapeHtml(t.test_type)}</td>
+                                            <td>${formatDate(t.request_date)}</td>
+                                            <td><span class="badge badge-${t.status === 'completed' ? 'success' : 'warning'}">${t.status === 'completed' ? 'Terminé' : 'En attente'}</span></td>
+                                            <td>
+                                                ${t.status !== 'completed' ? `<button class="btn btn-sm btn-success" onclick="saisirAnapath(${t.id})"><i class="fas fa-microscope"></i> Protocole</button>` : `<button class="btn btn-sm btn-info" onclick="voirResultat(${t.id})"><i class="fas fa-eye"></i> Voir</button>`}
+                                            </td>
+                                        </tr>
+                                    `).join('')}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="panel" id="panel-protocols">
+                            <div class="anapath-protocol">
+                                <h4><i class="fas fa-book"></i> Protocole Anapath</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Type de prélèvement</label>
+                                    <select class="form-control" id="anapathPrelevement">
+                                        <option value="Biopsie">Biopsie</option>
+                                        <option value="Pièce opératoire">Pièce opératoire</option>
+                                        <option value="Frottis">Frottis</option>
+                                        <option value="Autre">Autre</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Organe / Site</label>
+                                    <input class="form-control" id="anapathOrgane" placeholder="Ex: Sein, Poumon, Col utérin...">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Examen macroscopique</label>
+                                    <textarea class="form-control" id="anapathMacro" rows="3" placeholder="Description macroscopique..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Examen microscopique</label>
+                                    <textarea class="form-control" id="anapathMicro" rows="3" placeholder="Description microscopique..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Diagnostic</label>
+                                    <textarea class="form-control" id="anapathDiagnostic" rows="3" placeholder="Diagnostic..."></textarea>
+                                </div>
+                                <button class="btn btn-primary" onclick="sauvegarderProtocoleAnapath()"><i class="fas fa-save"></i> Sauvegarder le protocole</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function switchAnapathTab(tab) {
+            document.querySelectorAll('.section-tab').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+
+            if (tab === 'demandes') {
+                document.querySelector('.section-tab:first-child').classList.add('active');
+                document.getElementById('panel-demandes').classList.add('active');
+            } else {
+                document.querySelector('.section-tab:last-child').classList.add('active');
+                document.getElementById('panel-protocols').classList.add('active');
+            }
+        }
+
+        function saisirAnapath(testId) {
+            const test = testsCache.find(t => t.id === testId);
+            if (!test) return showToast('Analyse introuvable', 'error');
+
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="anapathModal" style="max-width:700px;">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-microscope"></i> Protocole Anapath</h3><span class="close-modal" onclick="closeModal('anapathModal')">&times;</span></div>
+                        <form onsubmit="saveAnapath(event, ${testId})" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Patient: <strong>${escapeHtml(test.patient_name)}</strong></label></div>
+                            <div class="form-group"><label class="form-label">Type: <strong>${escapeHtml(test.test_type)}</strong></label></div>
+                            <div class="form-group">
+                                <label class="form-label">Type de prélèvement</label>
+                                <select class="form-control" id="anapathPrelevementModal">
+                                    <option value="Biopsie">Biopsie</option>
+                                    <option value="Pièce opératoire">Pièce opératoire</option>
+                                    <option value="Frottis">Frottis</option>
+                                    <option value="Cytologie">Cytologie</option>
+                                    <option value="Autre">Autre</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organe / Site</label>
+                                <input class="form-control" id="anapathOrganeModal" placeholder="Ex: Sein, Poumon...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Examen macroscopique</label>
+                                <textarea class="form-control" id="anapathMacroModal" rows="3" placeholder="Description macroscopique..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Examen microscopique</label>
+                                <textarea class="form-control" id="anapathMicroModal" rows="3" placeholder="Description microscopique..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Diagnostic / Conclusion</label>
+                                <textarea class="form-control" id="anapathDiagnosticModal" rows="3" placeholder="Diagnostic..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-full"><i class="fas fa-save"></i> Enregistrer le protocole</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function saveAnapath(e, testId) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const prelevement = document.getElementById('anapathPrelevementModal').value;
+                const organe = sanitizeInput(document.getElementById('anapathOrganeModal').value);
+                const macro = sanitizeInput(document.getElementById('anapathMacroModal').value);
+                const micro = sanitizeInput(document.getElementById('anapathMicroModal').value);
+                const diagnostic = sanitizeInput(document.getElementById('anapathDiagnosticModal').value);
+
+                const result = {
+                    prelevement, organe, macro, micro, diagnostic,
+                    type: 'Anapath'
+                };
+
+                await api.put(`/laboratory/tests/${testId}/result`, {
+                    result: JSON.stringify(result),
+                    observations: `Anapath - ${prelevement} - ${organe}`,
+                    status: 'completed',
+                    completed_date: new Date().toISOString()
+                });
+
+                showToast('✅ Protocole Anapath enregistré', 'success');
+                closeModal('anapathModal');
+                loadPage('anapath');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        function sauvegarderProtocoleAnapath() {
+            showToast('Protocole sauvegardé (simulé)', 'success');
+        }
+
+        // ==================== VOIR / IMPRIMER RESULTAT ====================
+        async function voirResultat(testId) {
+            try {
+                const result = await api.get(`/laboratory/tests/${testId}/result`);
+                let resultText = result.result;
+
+                // Tenter de parser les paramètres JSON
+                try {
+                    const parsed = JSON.parse(result.result);
+                    if (typeof parsed === 'object') {
+                        resultText = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join('\n');
+                    }
+                } catch (e) {}
+
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="viewResultModal">
+                        <div class="modal-content">
+                            <div class="modal-header"><h3><i class="fas fa-file-alt"></i> Résultat</h3><span class="close-modal" onclick="closeModal('viewResultModal')">&times;</span></div>
+                            <div style="padding:16px;">
+                                <p><strong>Patient:</strong> ${escapeHtml(result.patient_name)}</p>
+                                <p><strong>Type:</strong> ${escapeHtml(result.test_type)}</p>
+                                <p><strong>Date:</strong> ${formatDate(result.completed_date)}</p>
+                                <h4>Résultat:</h4>
+                                <pre style="background:var(--gray-100);padding:12px;border-radius:8px;white-space:pre-wrap;">${escapeHtml(resultText)}</pre>
+                                ${result.observations ? `<h4>Observations:</h4><pre style="background:var(--gray-100);padding:12px;border-radius:8px;">${escapeHtml(result.observations)}</pre>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function imprimerResultat(testId) {
+            const test = testsCache.find(t => t.id === testId);
+            if (!test) return showToast('Analyse introuvable', 'error');
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Résultat - ${CONFIG.HOSPITAL_NAME}</title>
+                    <style>
+                        body { font-family: Arial; padding: 40px; }
+                        .header { text-align: center; border-bottom: 3px solid #0a5c7e; padding-bottom: 10px; margin-bottom: 20px; }
+                        .header h1 { color: #0a5c7e; }
+                        .infos { margin: 20px 0; padding: 10px; background: #f8fafc; border-radius: 6px; }
+                        .result { margin: 20px 0; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; }
+                        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+                        @media print { body { padding: 20px; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🏥 ${CONFIG.HOSPITAL_NAME}</h1>
+                        <p>📞 ${CONFIG.HOSPITAL_PHONE} • ✉️ ${CONFIG.HOSPITAL_EMAIL}</p>
+                        <h2>Résultat d'analyse</h2>
+                    </div>
+                    <div class="infos">
+                        <p><strong>Patient:</strong> ${escapeHtml(test.patient_name)}</p>
+                        <p><strong>Examen:</strong> ${escapeHtml(test.test_type)}</p>
+                        <p><strong>Date:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+                        <p><strong>N° Prélèvement:</strong> ${test.num_prelevement || '—'}</p>
+                    </div>
+                    <div class="result">
+                        <h3>Résultat</h3>
+                        <p>Consulter le dossier patient pour le détail complet.</p>
+                    </div>
+                    <div class="footer">
+                        <p>Document généré par I Hub — Résultat confidentiel</p>
+                    </div>
+                    <script>
+                        setTimeout(() => window.print(), 500);
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            showToast('📄 Impression en cours', 'success');
+        }
+
+        // ==================== STOCK ====================
+        async function stockPage(c) {
+            try {
+                const stock = await api.get('/laboratory/stock').catch(() => []);
+                stockCache = stock;
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-boxes"></i> Stock</h1><button class="btn btn-primary" onclick="showAddStockModal()"><i class="fas fa-plus"></i> Ajouter produit</button></div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">Total produits</div><div class="value">${stock.length}</div></div>
+                        <div class="insight-card"><div class="label">Stock bas</div><div class="value">${stock.filter(s => Number(s.quantity) <= Number(s.threshold || 0) && Number(s.quantity) > 0).length}</div></div>
+                        <div class="insight-card"><div class="label">Ruptures</div><div class="value">${stock.filter(s => Number(s.quantity) === 0).length}</div></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Produit</th><th>Catégorie</th><th>Quantité</th><th>Seuil</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody>${stock.map(s => `
+                                <tr>
+                                    <td><strong>${escapeHtml(s.name)}</strong></td>
+                                    <td>${escapeHtml(s.category || '—')}</td>
+                                    <td>${s.quantity}</td>
+                                    <td>${s.threshold || '—'}</td>
+                                    <td>${Number(s.quantity) === 0 ? '<span class="stock-alert">Rupture</span>' : Number(s.quantity) <= Number(s.threshold || 0) ? '<span class="stock-warning">Stock bas</span>' : '<span class="stock-ok">OK</span>'}</td>
+                                    <td><button class="btn btn-sm btn-warning" onclick="ajusterStock(${s.id})"><i class="fas fa-sliders-h"></i></button></td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function showAddStockModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addStockModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-plus"></i> Ajouter produit</h3><span class="close-modal" onclick="closeModal('addStockModal')">&times;</span></div>
+                        <form onsubmit="createStockItem(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Nom *</label><input type="text" class="form-control" id="stockName" required></div>
+                            <div class="form-group"><label class="form-label">Catégorie</label>
+                                <select class="form-control" id="stockCategory">
+                                    <option value="Réactif">Réactif</option>
+                                    <option value="Consommable">Consommable</option>
+                                    <option value="Matériel">Matériel</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Quantité *</label><input type="number" class="form-control" id="stockQuantity" required min="0"></div>
+                            <div class="form-group"><label class="form-label">Seuil critique</label><input type="number" class="form-control" id="stockThreshold" value="5"></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Ajouter</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createStockItem(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.post('/laboratory/stock', {
+                    name: sanitizeInput(document.getElementById('stockName').value),
+                    category: document.getElementById('stockCategory').value,
+                    quantity: parseInt(document.getElementById('stockQuantity').value) || 0,
+                    threshold: parseInt(document.getElementById('stockThreshold').value) || 5
+                });
+                showToast('Produit ajouté', 'success');
+                closeModal('addStockModal');
+                loadPage('stock');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        async function ajusterStock(id) {
+            const item = stockCache.find(s => s.id === id);
+            if (!item) return showToast('Produit introuvable', 'error');
+            const newQty = prompt(`Quantité actuelle: ${item.quantity}\nNouvelle quantité:`, item.quantity);
+            if (newQty === null) return;
+            showLoading();
+            try {
+                await api.put(`/laboratory/stock/${id}`, { quantity: parseInt(newQty) || 0 });
+                showToast('Stock mis à jour', 'success');
+                loadPage('stock');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== RAPPORTS ====================
+        async function rapportsPage(c) {
+            try {
+                const [tests, results, prelevements] = await Promise.all([
+                    api.get('/laboratory/tests').catch(() => []),
+                    api.get('/laboratory/results').catch(() => []),
+                    api.get('/laboratory/prelevements').catch(() => [])
+                ]);
+
+                const totalTests = tests.length;
+                const totalResults = results.length;
+                const totalPrelevements = prelevements.length;
+                const completed = tests.filter(t => t.status === 'completed').length;
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-chart-bar"></i> Rapports</h1><button class="btn btn-primary" onclick="exportRapportPDF()"><i class="fas fa-file-pdf"></i> Exporter PDF</button></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${totalTests}</div><div class="stat-label">Analyses totales</div></div>
+                        <div class="stat-card"><div class="stat-value">${totalPrelevements}</div><div class="stat-label">Prélèvements</div></div>
+                        <div class="stat-card"><div class="stat-value">${completed}</div><div class="stat-label">Terminées</div></div>
+                        <div class="stat-card"><div class="stat-value">${totalResults}</div><div class="stat-label">Résultats enregistrés</div></div>
+                    </div>
+                    <div class="dashboard-card"><h3><i class="fas fa-list"></i> Registre des prélèvements</h3>
+                        <div class="table-container"><table class="data-table"><thead><tr><th>N°</th><th>Patient</th><th>Type</th><th>Date</th></tr></thead><tbody>${prelevements.slice(0, 10).map(p => `
+                            <tr><td><strong>${escapeHtml(p.num_prelevement)}</strong></td><td>${escapeHtml(p.patient_name)}</td><td>${escapeHtml(p.type)}</td><td>${formatDate(p.created_at)}</td></tr>
+                        `).join('')}</tbody></table></div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function exportRapportPDF() {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+            const content = document.getElementById('pageContent');
+            printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>Rapport Laboratoire</title>
+                <style>body{font-family:Arial;padding:40px;}h1{color:#0a5c7e;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{padding:10px;border:1px solid #ddd;text-align:left;}th{background:#0a5c7e;color:#fff;}@media print{body{padding:20px;}}</style></head><body>
+                <h1>Rapport Laboratoire - ${CONFIG.HOSPITAL_NAME}</h1>
+                <p>Généré le ${new Date().toLocaleString('fr-FR')}</p>
+                ${content.innerHTML}
+                </body></html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 500);
+        }
+
+        // ==================== LOGOUT ====================
+        function logout() {
+            if (confirm('Se déconnecter ?')) { Storage.clear(); window.location.href = 'index.html'; }
+        }
+
+        // ==================== INIT ====================
+        function init() {
+            const token = Storage.get('token');
+            const user = Storage.get('user');
+            if (token && user) {
+                currentUser = user;
+                api = new API(CONFIG.API_URL);
+                document.getElementById('userInfo').innerHTML = `<strong>${escapeHtml(user.name)}</strong><br><small>${escapeHtml(getRoleLabel(user.role))}</small>`;
+                buildNav();
+                loadPage('dashboard');
+                setTimeout(() => document.getElementById('loadingOverlay').classList.remove('active'), 300);
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Exposer les fonctions globales
+        window.loadPage = loadPage;
+        window.logout = logout;
+        window.showToast = showToast;
+        window.closeModal = closeModal;
+        window.preleverEchantillon = preleverEchantillon;
+        window.saisirResultatsBiologie = saisirResultatsBiologie;
+        window.saisirAnapath = saisirAnapath;
+        window.voirResultat = voirResultat;
+        window.imprimerResultat = imprimerResultat;
+        window.showDemandeModal = showDemandeModal;
+        window.createDemande = createDemande;
+        window.saveResultatsBiologie = saveResultatsBiologie;
+        window.saveAnapath = saveAnapath;
+        window.switchAnapathTab = switchAnapathTab;
+        window.sauvegarderProtocoleAnapath = sauvegarderProtocoleAnapath;
+        window.showAddStockModal = showAddStockModal;
+        window.createStockItem = createStockItem;
+        window.ajusterStock = ajusterStock;
+        window.exportRapportPDF = exportRapportPDF;
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

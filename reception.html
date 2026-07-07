@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Hub — Réception</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="logo.jpg">
+    <style>
+        .info-banner {
+            background: #f0fdf4;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid #16a34a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-banner i { color: #16a34a; font-size: 18px; }
+        .info-banner span { font-size: 13px; color: #065f46; }
+        .patient-card-barcode {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px dashed #cbd5e1;
+        }
+        .patient-card-barcode img { max-width: 200px; height: auto; }
+        .patient-card-barcode p { margin-top: 8px; font-size: 12px; color: #64748b; }
+        .balance-positive { color: #16a34a; font-weight: 700; }
+        .balance-negative { color: #dc2626; font-weight: 700; }
+        .balance-zero { color: #64748b; font-weight: 700; }
+        .invoice-preview {
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .invoice-preview p { margin: 4px 0; }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOADING ===== -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <img src="logo.jpg" alt="I Hub" class="loading-logo">
+            <div class="loading-pulse"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== MOBILE MENU ===== -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <img src="logo.jpg" alt="I Hub" style="width:44px;height:44px;border-radius:12px;object-fit:contain;">
+                <div>
+                    <h2>I Hub</h2>
+                    <p id="userInfo">Chargement...</p>
+                </div>
+            </div>
+        </div>
+        <div id="navMenu"></div>
+        <div class="sidebar-footer">
+            <button class="btn btn-danger btn-sm btn-full" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main-content" id="mainContent">
+        <div id="pageContent"></div>
+    </main>
+
+    <script>
+        // ==================== CONFIG ====================
+        const CONFIG = {
+            API_URL: 'https://jokair.onrender.com/api',
+            APP_NAME: 'I-Hub',
+            HOSPITAL_NAME: 'I Hub',
+            HOSPITAL_PHONE: '+243 974 336 700',
+            HOSPITAL_EMAIL: 'jeremyodimba322@gmail.com',
+            CURRENCY: 'Fc'
+        };
+
+        // ==================== STORAGE ====================
+        class Storage {
+            static get(k) {
+                try {
+                    const s = sessionStorage.getItem(k);
+                    if (s !== null) return JSON.parse(s);
+                    const l = localStorage.getItem(k);
+                    return l ? JSON.parse(l) : null;
+                } catch { return null; }
+            }
+            static set(k, v) {
+                sessionStorage.setItem(k, JSON.stringify(v));
+                localStorage.setItem(k, JSON.stringify(v));
+            }
+            static clear() {
+                sessionStorage.clear();
+                localStorage.clear();
+            }
+        }
+
+        // ==================== API ====================
+        class API {
+            constructor(url) { this.url = url; }
+            async request(endpoint, options = {}) {
+                const token = Storage.get('token');
+                const headers = { ...options.headers };
+                if (!(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                try {
+                    const res = await fetch(`${this.url}${endpoint}`, { ...options, headers, credentials: 'include' });
+                    if (res.status === 401) { this.logout(); throw new Error('Session expirée'); }
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || data.message || 'Erreur');
+                    return data;
+                } catch (e) { throw e; }
+            }
+            get(e) { return this.request(e, { method: 'GET' }); }
+            post(e, b) { return this.request(e, { method: 'POST', body: JSON.stringify(b) }); }
+            put(e, b) { return this.request(e, { method: 'PUT', body: JSON.stringify(b) }); }
+            patch(e, b) { return this.request(e, { method: 'PATCH', body: JSON.stringify(b) }); }
+            delete(e) { return this.request(e, { method: 'DELETE' }); }
+            logout() { Storage.clear(); window.location.href = 'index.html'; }
+        }
+
+        let api = null, currentUser = null;
+        let patientsCache = [],
+            appointmentsCache = [],
+            invoicesCache = [],
+            tariffsCache = [],
+            subscribersCache = [],
+            queueCache = [],
+            prescriptionsCache = [],
+            patientAccountsCache = [];
+
+        // ==================== HELPERS ====================
+        function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+        function showToast(msg, type = 'info') {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle' };
+            t.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div');
+            d.textContent = t; return d.innerHTML; }
+
+        function sanitizeInput(t) { if (!t) return ''; return String(t).replace(/[<>`]/g, '').trim(); }
+
+        function safeText(v, f = '—') { return v === null || v === undefined || v === '' ? f : v; }
+
+        function formatDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('fr-FR'); } catch { return d; } }
+
+        function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('fr-FR'); } catch { return d; } }
+
+        function formatMoney(v) { const a = Number(v || 0); return `${a.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${CONFIG.CURRENCY}`; }
+
+        function getRoleLabel(r) { const roles = { super_admin: 'Admin', reception: 'Réception', docteur: 'Médecin' }; return roles[
+                r] || r; }
+
+        function getGreetingMessage() { const h = new Date().getHours(); if (h < 12) return 'Bonjour'; if (h < 18) return 'Bon après-midi'; return 'Bonsoir'; }
+
+        function formatShortTime() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+
+        function sortByDateDesc(arr, key = 'created_at') { return [...(arr || [])].sort((a, b) => new Date(b?.[key] || 0) - new Date(
+                a?.[key] || 0)); }
+
+        function closeModal(id) { const m = document.getElementById(id); if (m) m.remove(); }
+
+        function closeSidebar() { document.getElementById('sidebar')?.classList.remove('mobile-open');
+            document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+
+        function toggleSidebar() { const s = document.getElementById('sidebar'); const o = document.getElementById(
+            'sidebarOverlay'); if (!s || !o) return;
+            s.classList.toggle('mobile-open');
+            o.classList.toggle('active', s.classList.contains('mobile-open')); }
+
+        function getCurrentRole() { return currentUser?.role || ''; }
+
+        function isAdmin() { return getCurrentRole() === 'super_admin'; }
+
+        function canAccessPage(id) { if (isAdmin()) return true; return (ROLE_PAGE_ACCESS[getCurrentRole()] || []).includes(id); }
+
+        // ==================== ROLE ACCESS ====================
+        const ROLE_PAGE_ACCESS = {
+            super_admin: ['dashboard', 'patients', 'appointments', 'waiting-room', 'billing', 'subscribers', 'reports',
+                'patient-account'
+            ],
+            reception: ['dashboard', 'patients', 'appointments', 'waiting-room', 'billing', 'subscribers', 'reports',
+                'patient-account'
+            ]
+        };
+
+        // ==================== NAVIGATION ====================
+        function buildNav() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord' },
+                { id: 'patients', icon: 'fa-users', label: 'Patients' },
+                { id: 'appointments', icon: 'fa-calendar-alt', label: 'Rendez-vous' },
+                { id: 'waiting-room', icon: 'fa-clock', label: "Salle d'attente" },
+                { id: 'billing', icon: 'fa-file-invoice-dollar', label: 'Facturation' },
+                { id: 'patient-account', icon: 'fa-wallet', label: 'Compte patient' },
+                { id: 'subscribers', icon: 'fa-handshake', label: 'Abonnés' },
+                { id: 'reports', icon: 'fa-chart-bar', label: 'Rapports' }
+            ];
+            const allowed = items.filter(i => canAccessPage(i.id));
+            menu.innerHTML = allowed.map(i =>
+                `<div class="nav-item" data-page="${i.id}" onclick="loadPage('${i.id}')"><i class="fas ${i.icon}"></i><span>${i.label}</span></div>`
+                ).join('');
+        }
+
+        // ==================== PAGE LOADER ====================
+        function loadPage(id) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const active = document.querySelector(`.nav-item[data-page="${id}"]`);
+            if (active) active.classList.add('active');
+            showLoading();
+            setTimeout(async () => {
+                try {
+                    const c = document.getElementById('pageContent');
+                    switch (id) {
+                        case 'dashboard':
+                            await dashboard(c);
+                            break;
+                        case 'patients':
+                            await patientsPage(c);
+                            break;
+                        case 'appointments':
+                            await appointmentsPage(c);
+                            break;
+                        case 'waiting-room':
+                            await waitingRoom(c);
+                            break;
+                        case 'billing':
+                            await billingPage(c);
+                            break;
+                        case 'patient-account':
+                            await patientAccountPage(c);
+                            break;
+                        case 'subscribers':
+                            await subscribersPage(c);
+                            break;
+                        case 'reports':
+                            await reportsPage(c);
+                            break;
+                        default:
+                            c.innerHTML = '<div class="empty-state"><i class="fas fa-file"></i><p>Page en construction</p></div>';
+                    }
+                } catch (e) { showToast(e.message || 'Erreur', 'error'); }
+                hideLoading();
+            }, 200);
+        }
+
+        // ==================== DASHBOARD ====================
+        async function dashboard(c) {
+            try {
+                const [patients, appointments, invoices, queue, accounts] = await Promise.all([
+                    api.get('/patients').catch(() => []),
+                    api.get('/appointments').catch(() => []),
+                    api.get('/billing').catch(() => []),
+                    api.get('/workflow/queue').catch(() => []),
+                    api.get('/billing/accounts').catch(() => [])
+                ]);
+                patientsCache = patients;
+                appointmentsCache = appointments;
+                invoicesCache = invoices;
+                queueCache = Array.isArray(queue) ? queue : [];
+                patientAccountsCache = accounts;
+
+                const now = new Date();
+                const today = now.toISOString().split('T')[0];
+                const todayInvoices = invoices.filter(i => i.created_at?.startsWith(today));
+                const paidToday = todayInvoices.filter(i => i.status === 'paid');
+                const totalToday = paidToday.reduce((s, i) => s + Number(i.amount || 0), 0);
+                const waiting = queueCache.length;
+                const greeting = getGreetingMessage();
+
+                // Calcul des dettes totales
+                const totalDebt = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1><span class="badge badge-info"><i class="far fa-calendar"></i> ${now.toLocaleDateString('fr-FR')}</span></div>
+                    <div class="dashboard-greeting-card"><div class="dashboard-greeting-copy"><h2>${greeting}, ${escapeHtml(currentUser?.name || 'Réception')}</h2><p style="color:var(--gray-500);">Résumé de la réception</p></div><div class="dashboard-time-card"><span style="font-size:12px;color:var(--gray-500);">Heure</span><strong>${formatShortTime()}</strong></div></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-users"></i></div><div class="stat-value">${patients.length}</div><div class="stat-label">Patients</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-clock"></i></div><div class="stat-value">${waiting}</div><div class="stat-label">En attente</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-calendar-alt"></i></div><div class="stat-value">${appointments.length}</div><div class="stat-label">Rendez-vous</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-file-invoice-dollar"></i></div><div class="stat-value">${formatMoney(totalToday)}</div><div class="stat-label">Encaissé aujourd'hui</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-wallet"></i></div><div class="stat-value">${formatMoney(totalDebt)}</div><div class="stat-label">Dettes totales</div></div>
+                    </div>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card"><h3><i class="fas fa-user-injured"></i> Derniers patients</h3>${patients.slice(0, 5).map(p => `<div style="padding:4px 0;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;"><span><strong>${escapeHtml(p.full_name)}</strong></span><span style="color:var(--gray-500);font-size:13px;">${formatDate(p.created_at)}</span></div>`).join('')}</div>
+                        <div class="dashboard-card"><h3><i class="fas fa-file-invoice"></i> Dernières factures</h3>${invoices.slice(0, 5).map(i => `<div style="padding:4px 0;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;"><span>${escapeHtml(i.patient_name)}</span><span style="color:var(--gray-500);font-size:13px;">${formatMoney(i.amount)}</span></div>`).join('')}</div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error');
+                c.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p></div>`; }
+        }
+
+        // ==================== PATIENTS ====================
+        async function patientsPage(c) {
+            try {
+                const patients = await api.get('/patients').catch(() => []);
+                patientsCache = patients;
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-users"></i> Patients</h1><button class="btn btn-primary" onclick="showAddPatientModal()"><i class="fas fa-plus"></i> Nouveau patient</button></div>
+                    <div class="search-bar"><i class="fas fa-search"></i><input id="patientSearch" placeholder="Rechercher..." oninput="filterPatients(this.value)"></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="patientTableBody">${patients.map(p => `
+                        <tr><td>#${p.id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.phone || '—')}</td><td><span class="badge badge-${p.status === 'admitted' ? 'warning' : p.status === 'discharged' ? 'info' : 'success'}">${p.status === 'admitted' ? 'Hospitalisé' : p.status === 'discharged' ? 'Sorti' : 'Actif'}</span></td>
+                        <td><button class="btn btn-sm btn-info" onclick="viewPatient(${p.id})"><i class="fas fa-id-card"></i> Fiche</button><button class="btn btn-sm btn-primary" onclick="editPatient(${p.id})"><i class="fas fa-edit"></i></button></td></tr>
+                    `).join('')}</tbody></table></div>
+                `;
+                window._patientsData = patients;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function filterPatients(v) {
+            const term = (v || '').toLowerCase();
+            const tbody = document.getElementById('patientTableBody');
+            if (!tbody) return;
+            const data = window._patientsData || [];
+            const filtered = data.filter(p => p.full_name.toLowerCase().includes(term) || (p.phone || '').includes(term));
+            tbody.innerHTML = filtered.map(p => `
+                <tr><td>#${p.id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.phone || '—')}</td>
+                <td><span class="badge badge-${p.status === 'admitted' ? 'warning' : p.status === 'discharged' ? 'info' : 'success'}">${p.status === 'admitted' ? 'Hospitalisé' : p.status === 'discharged' ? 'Sorti' : 'Actif'}</span></td>
+                <td><button class="btn btn-sm btn-info" onclick="viewPatient(${p.id})"><i class="fas fa-id-card"></i> Fiche</button><button class="btn btn-sm btn-primary" onclick="editPatient(${p.id})"><i class="fas fa-edit"></i></button></td></tr>
+            `).join('');
+        }
+
+        function showAddPatientModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addPatientModal">
+                    <div class="modal-content" style="max-width:600px;">
+                        <div class="modal-header"><h3><i class="fas fa-user-plus"></i> Nouveau patient</h3><span class="close-modal" onclick="closeModal('addPatientModal')">&times;</span></div>
+                        <form onsubmit="createPatient(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Nom complet *</label><input type="text" class="form-control" id="pName" required></div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Téléphone</label><input type="text" class="form-control" id="pPhone"></div>
+                                <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="pEmail"></div>
+                            </div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Date naissance</label><input type="date" class="form-control" id="pDob"></div>
+                                <div class="form-group"><label class="form-label">Genre</label><select class="form-control" id="pGender"><option value="M">Masculin</option><option value="F">Féminin</option></select></div>
+                            </div>
+                            <div class="form-group"><label class="form-label">Groupe sanguin</label><select class="form-control" id="pBlood"><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="O+">O+</option><option value="O-">O-</option><option value="AB+">AB+</option><option value="AB-">AB-</option></select></div>
+                            <div class="form-group"><label class="form-label">Adresse</label><textarea class="form-control" id="pAddress" rows="2"></textarea></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createPatient(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const patient = await api.post('/patients', {
+                    full_name: sanitizeInput(document.getElementById('pName').value),
+                    phone: sanitizeInput(document.getElementById('pPhone').value),
+                    email: sanitizeInput(document.getElementById('pEmail').value),
+                    date_of_birth: document.getElementById('pDob').value || null,
+                    gender: document.getElementById('pGender').value,
+                    blood_type: document.getElementById('pBlood').value,
+                    address: sanitizeInput(document.getElementById('pAddress').value)
+                });
+                showToast('Patient créé', 'success');
+                await api.post('/workflow/queue', { patient_id: patient.id, priority: 'normal' });
+                // Créer automatiquement un compte patient
+                await api.post('/billing/accounts', { patient_id: patient.id, balance: 0 });
+                closeModal('addPatientModal');
+                loadPage('patients');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function viewPatient(id) {
+            showLoading();
+            try {
+                const [patient, account] = await Promise.all([
+                    api.get(`/patients/${id}`),
+                    api.get(`/billing/accounts/${id}`).catch(() => ({ balance: 0 }))
+                ]);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="viewPatientModal">
+                        <div class="modal-content" style="max-width:700px;">
+                            <div class="modal-header"><h3><i class="fas fa-user-circle"></i> Fiche patient</h3><span class="close-modal" onclick="closeModal('viewPatientModal')">&times;</span></div>
+                            <div style="padding:16px;">
+                                <h2 style="margin-bottom:4px;">${escapeHtml(patient.full_name)}</h2>
+                                <p style="color:var(--gray-500);">ID: #${patient.id} • ${escapeHtml(patient.gender === 'M' ? 'Masculin' : 'Féminin')}</p>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;">
+                                    <div><strong>Téléphone:</strong> ${escapeHtml(patient.phone || '—')}</div>
+                                    <div><strong>Email:</strong> ${escapeHtml(patient.email || '—')}</div>
+                                    <div><strong>Date naissance:</strong> ${formatDate(patient.date_of_birth)}</div>
+                                    <div><strong>Groupe sanguin:</strong> ${escapeHtml(patient.blood_type || '—')}</div>
+                                    <div><strong>Statut:</strong> ${patient.status === 'admitted' ? 'Hospitalisé' : patient.status === 'discharged' ? 'Sorti' : 'Actif'}</div>
+                                    <div><strong>Solde compte:</strong> <span class="${account.balance > 0 ? 'balance-negative' : account.balance < 0 ? 'balance-positive' : 'balance-zero'}">${formatMoney(account.balance)}</span></div>
+                                </div>
+                                ${patient.address ? `<p><strong>Adresse:</strong> ${escapeHtml(patient.address)}</p>` : ''}
+                                ${patient.is_pregnant ? '<p><span class="badge badge-warning">Femme enceinte</span></p>' : ''}
+                                <div style="margin-top:16px;border-top:1px solid var(--gray-200);padding-top:12px;">
+                                    <h4 style="margin-bottom:8px;"><i class="fas fa-barcode"></i> Carte patient</h4>
+                                    <div class="patient-card-barcode">
+                                        <img src="${CONFIG.API_URL}/patients/${patient.id}/barcode" alt="Code-barre" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%2250%22%3E%3Crect width=%22200%22 height=%2250%22 fill=%22%23f1f5f9%22/%3E%3Ctext x=%2250%22 y=%2230%22 font-family=%22monospace%22 font-size=%2216%22 fill=%22%2364748b%22%3EPAT-${patient.id}%3C/text%3E%3C/svg%3E'">
+                                        <p>ID: #${patient.id}</p>
+                                    </div>
+                                    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                                        <button class="btn btn-sm btn-secondary" onclick="printPatientCard(${patient.id})"><i class="fas fa-print"></i> Imprimer carte</button>
+                                        <button class="btn btn-sm btn-info" onclick="viewPatientAccount(${patient.id})"><i class="fas fa-wallet"></i> Voir compte</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        function printPatientCard(id) {
+            const patient = patientsCache.find(p => p.id === id);
+            if (!patient) return showToast('Patient introuvable', 'error');
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+            const barcodeUrl = `${CONFIG.API_URL}/patients/${patient.id}/barcode`;
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>Carte patient - ${CONFIG.HOSPITAL_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: Arial, sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                    .card { width: 350px; padding: 24px; background: white; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); text-align: center; border: 2px solid #0a5c7e; }
+                    .card .logo { color: #0a5c7e; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+                    .card .subtitle { color: #64748b; font-size: 11px; margin-bottom: 12px; }
+                    .card .name { font-size: 20px; font-weight: 700; margin: 8px 0; }
+                    .card .id { color: #64748b; font-size: 13px; margin-bottom: 12px; }
+                    .card .barcode { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px dashed #cbd5e1; }
+                    .card .barcode img { max-width: 100%; height: auto; }
+                    .card .footer { margin-top: 12px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+                    @media print { body { background: white; } .card { box-shadow: none; border: 2px solid #0a5c7e; } }
+                </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="logo">🏥 ${CONFIG.HOSPITAL_NAME}</div>
+                        <div class="subtitle">CARTE D'IDENTIFICATION</div>
+                        <div class="name">${escapeHtml(patient.full_name)}</div>
+                        <div class="id">ID: #${patient.id}</div>
+                        <div class="barcode">
+                            <img src="${barcodeUrl}" alt="Code-barre" onerror="this.parentElement.innerHTML='<span style=\\'font-size:18px;font-weight:bold;\\'>PAT-${patient.id}</span>'">
+                        </div>
+                        <div class="footer">${CONFIG.HOSPITAL_PHONE}</div>
+                    </div>
+                    <script>
+                        setTimeout(() => window.print(), 800);
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
+        async function editPatient(id) {
+            try {
+                const patient = await api.get(`/patients/${id}`);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="editPatientModal">
+                        <div class="modal-content" style="max-width:600px;">
+                            <div class="modal-header"><h3><i class="fas fa-user-edit"></i> Modifier patient</h3><span class="close-modal" onclick="closeModal('editPatientModal')">&times;</span></div>
+                            <form onsubmit="updatePatient(event, ${id})" style="padding:16px;">
+                                <div class="form-group"><label class="form-label">Nom complet *</label><input type="text" class="form-control" id="eName" value="${escapeHtml(patient.full_name)}" required></div>
+                                <div class="modal-grid">
+                                    <div class="form-group"><label class="form-label">Téléphone</label><input type="text" class="form-control" id="ePhone" value="${escapeHtml(patient.phone || '')}"></div>
+                                    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="eEmail" value="${escapeHtml(patient.email || '')}"></div>
+                                </div>
+                                <div class="form-group"><label class="form-label">Statut</label><select class="form-control" id="eStatus"><option value="active" ${patient.status === 'active' ? 'selected' : ''}>Actif</option><option value="admitted" ${patient.status === 'admitted' ? 'selected' : ''}>Hospitalisé</option><option value="discharged" ${patient.status === 'discharged' ? 'selected' : ''}>Sorti</option></select></div>
+                                <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Mettre à jour</button>
+                            </form>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function updatePatient(e, id) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.put(`/patients/${id}`, {
+                    full_name: sanitizeInput(document.getElementById('eName').value),
+                    phone: sanitizeInput(document.getElementById('ePhone').value),
+                    email: sanitizeInput(document.getElementById('eEmail').value),
+                    status: document.getElementById('eStatus').value
+                });
+                showToast('Patient modifié', 'success');
+                closeModal('editPatientModal');
+                loadPage('patients');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        // ==================== APPOINTMENTS ====================
+        async function appointmentsPage(c) {
+            try {
+                const appointments = await api.get('/appointments').catch(() => []);
+                appointmentsCache = appointments;
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-calendar-alt"></i> Rendez-vous</h1><button class="btn btn-primary" onclick="showAddAppointmentModal()"><i class="fas fa-plus"></i> Nouveau RDV</button></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Patient</th><th>Date</th><th>Type</th><th>Statut</th><th>Actions</th></tr></thead><tbody>${appointments.map(a => `
+                        <tr><td><strong>${escapeHtml(a.patient_name)}</strong></td><td>${fmtDate(a.date)}</td><td>${escapeHtml(a.type)}</td><td><span class="badge badge-${a.status === 'scheduled' ? 'info' : a.status === 'completed' ? 'success' : 'danger'}">${a.status === 'scheduled' ? 'Planifié' : a.status === 'completed' ? 'Terminé' : 'Annulé'}</span></td>
+                        <td><button class="btn btn-sm btn-primary" onclick="editAppointment(${a.id})"><i class="fas fa-edit"></i></button><select onchange="updateAppointmentStatus(${a.id}, this.value)" class="form-control" style="width:100px;padding:4px;"><option value="scheduled" ${a.status === 'scheduled' ? 'selected' : ''}>Planifié</option><option value="completed" ${a.status === 'completed' ? 'selected' : ''}>Terminé</option><option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>Annulé</option></select></td></tr>
+                    `).join('')}</tbody></table></div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function showAddAppointmentModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addAppointmentModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-calendar-plus"></i> Nouveau RDV</h3><span class="close-modal" onclick="closeModal('addAppointmentModal')">&times;</span></div>
+                        <form onsubmit="createAppointment(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Patient *</label><select class="form-control" id="aPatient" required><option value="">Sélectionner</option>${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}</select></div>
+                            <div class="form-group"><label class="form-label">Date et heure *</label><input type="datetime-local" class="form-control" id="aDate" required></div>
+                            <div class="form-group"><label class="form-label">Type</label><select class="form-control" id="aType"><option value="Consultation">Consultation</option><option value="Urgence">Urgence</option><option value="Contrôle">Contrôle</option></select></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createAppointment(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const patientId = document.getElementById('aPatient').value;
+                const appointment = await api.post('/appointments', {
+                    patient_id: patientId,
+                    date: document.getElementById('aDate').value,
+                    type: document.getElementById('aType').value,
+                    status: 'scheduled'
+                });
+                await api.post('/workflow/queue', { patient_id: parseInt(patientId), priority: 'normal' });
+                showToast('RDV créé et patient en salle d\'attente', 'success');
+                closeModal('addAppointmentModal');
+                loadPage('appointments');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function updateAppointmentStatus(id, status) {
+            showLoading();
+            try {
+                await api.patch(`/appointments/${id}`, { status });
+                showToast('Statut mis à jour', 'success');
+                loadPage('appointments');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function editAppointment(id) {
+            try {
+                const appt = appointmentsCache.find(a => a.id === id);
+                if (!appt) return showToast('RDV introuvable', 'error');
+                const date = new Date(appt.date);
+                const dateStr = date.toISOString().slice(0, 16);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="editAppointmentModal">
+                        <div class="modal-content" style="max-width:500px;">
+                            <div class="modal-header"><h3><i class="fas fa-edit"></i> Modifier RDV</h3><span class="close-modal" onclick="closeModal('editAppointmentModal')">&times;</span></div>
+                            <form onsubmit="updateAppointment(event, ${id})" style="padding:16px;">
+                                <div class="form-group"><label class="form-label">Patient</label><input type="text" class="form-control" value="${escapeHtml(appt.patient_name)}" disabled></div>
+                                <div class="form-group"><label class="form-label">Date et heure *</label><input type="datetime-local" class="form-control" id="eDate" value="${dateStr}" required></div>
+                                <div class="form-group"><label class="form-label">Type</label><select class="form-control" id="eType"><option value="Consultation" ${appt.type === 'Consultation' ? 'selected' : ''}>Consultation</option><option value="Urgence" ${appt.type === 'Urgence' ? 'selected' : ''}>Urgence</option><option value="Contrôle" ${appt.type === 'Contrôle' ? 'selected' : ''}>Contrôle</option></select></div>
+                                <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Mettre à jour</button>
+                            </form>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function updateAppointment(e, id) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.put(`/appointments/${id}`, {
+                    date: document.getElementById('eDate').value,
+                    type: document.getElementById('eType').value
+                });
+                showToast('RDV modifié', 'success');
+                closeModal('editAppointmentModal');
+                loadPage('appointments');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        // ==================== WAITING ROOM (SANS BOUTON AJOUTER) ====================
+        async function waitingRoom(c) {
+            try {
+                const queue = await api.get('/workflow/queue').catch(() => []);
+                queueCache = Array.isArray(queue) ? queue : [];
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-clock"></i> Salle d'attente</h1><span class="badge badge-${queueCache.length ? 'warning' : 'success'}">${queueCache.length} patient(s)</span></div>
+                    <div class="info-banner">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Les patients arrivent automatiquement depuis l'enregistrement ou les rendez-vous.</span>
+                    </div>
+                    ${queueCache.length ? `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>#</th><th>Patient</th><th>Arrivée</th><th>Priorité</th><th>Statut</th></tr></thead>
+                            <tbody>${queueCache.map((q, i) => `
+                                <tr>
+                                    <td>${i+1}</td>
+                                    <td><strong>${escapeHtml(q.patient_name || '—')}</strong></td>
+                                    <td>${fmtDate(q.arrived_at || q.created_at)}</td>
+                                    <td><span class="badge badge-${q.priority === 'urgent' ? 'danger' : 'info'}">${q.priority === 'urgent' ? '🔴 Urgent' : 'Normal'}</span></td>
+                                    <td><span class="badge badge-${q.status === 'waiting' ? 'warning' : q.status === 'assigned' ? 'info' : 'success'}">${q.status === 'waiting' ? 'En attente' : q.status === 'assigned' ? 'Assigné' : 'Terminé'}</span></td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>` : '<div class="empty-state"><i class="fas fa-clock"></i><p>Aucun patient en salle d\'attente</p></div>'}
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== BILLING ====================
+        async function billingPage(c) {
+            try {
+                const [invoices, tariffs, prescriptions] = await Promise.all([
+                    api.get('/billing').catch(() => []),
+                    api.get('/tariffs').catch(() => []),
+                    api.get('/prescriptions').catch(() => [])
+                ]);
+                invoicesCache = invoices;
+                tariffsCache = tariffs;
+                prescriptionsCache = prescriptions;
+
+                const paid = invoices.filter(i => i.status === 'paid');
+                const unpaid = invoices.filter(i => i.status !== 'paid');
+                const totalPaid = paid.reduce((s, i) => s + Number(i.amount || 0), 0);
+                const totalUnpaid = unpaid.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+                // Prescriptions en attente de facturation
+                const pendingPrescriptions = prescriptions.filter(p => !p.invoiced);
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-file-invoice-dollar"></i> Facturation</h1>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn btn-primary" onclick="showAddInvoiceModal()"><i class="fas fa-plus"></i> Nouvelle facture</button>
+                            <button class="btn btn-success" onclick="autoGenerateInvoice()"><i class="fas fa-magic"></i> Facturer auto</button>
+                            <button class="btn btn-secondary" onclick="showTariffModal()"><i class="fas fa-tags"></i> Grille tarifaire</button>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${invoices.length}</div><div class="stat-label">Total factures</div></div>
+                        <div class="stat-card"><div class="stat-value">${paid.length}</div><div class="stat-label">Payées</div></div>
+                        <div class="stat-card"><div class="stat-value">${unpaid.length}</div><div class="stat-label">Impayées</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalPaid)}</div><div class="stat-label">Encaissé</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalUnpaid)}</div><div class="stat-label">Créances</div></div>
+                        <div class="stat-card"><div class="stat-value">${pendingPrescriptions.length}</div><div class="stat-label">Prescriptions en attente</div></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>N°</th><th>Patient</th><th>Montant</th><th>Statut</th><th>Date</th><th>Actions</th></tr></thead>
+                            <tbody>${invoices.map(i => `
+                                <tr>
+                                    <td><strong>${escapeHtml(i.invoice_number || `FAC-${i.id}`)}</strong></td>
+                                    <td>${escapeHtml(i.patient_name)}</td>
+                                    <td>${formatMoney(i.amount)}</td>
+                                    <td><span class="badge badge-${i.status === 'paid' ? 'success' : 'danger'}">${i.status === 'paid' ? 'Payée' : 'Impayée'}</span></td>
+                                    <td>${formatDate(i.created_at)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="viewInvoice(${i.id})"><i class="fas fa-eye"></i></button>
+                                        ${i.status !== 'paid' ? `<button class="btn btn-sm btn-success" onclick="payInvoice(${i.id})"><i class="fas fa-check"></i></button>` : ''}
+                                        <button class="btn btn-sm btn-secondary" onclick="exportInvoicePDF(${i.id})"><i class="fas fa-file-pdf"></i></button>
+                                    </td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== AUTO GENERATE INVOICE ====================
+        async function autoGenerateInvoice() {
+            showLoading();
+            try {
+                const prescriptions = await api.get('/prescriptions');
+                const notInvoiced = prescriptions.filter(p => !p.invoiced);
+
+                if (!notInvoiced.length) {
+                    showToast('Aucune prescription en attente de facturation', 'info');
+                    hideLoading();
+                    return;
+                }
+
+                const tariffs = await api.get('/tariffs');
+                let total = 0;
+                const items = [];
+
+                for (const p of notInvoiced) {
+                    const tariff = tariffs.find(t =>
+                        t.label.toLowerCase() === p.medication.toLowerCase() ||
+                        t.code === p.medication_code
+                    );
+                    const price = tariff ? (tariff.price_fc || tariff.price_usd * 2800) : 0;
+                    total += price;
+                    items.push({
+                        prescription_id: p.id,
+                        description: p.medication,
+                        quantity: 1,
+                        unit_price: price,
+                        amount: price
+                    });
+                    await api.patch(`/prescriptions/${p.id}`, { invoiced: true });
+                }
+
+                const patientId = notInvoiced[0]?.patient_id;
+                if (!patientId) throw new Error('Aucun patient trouvé');
+
+                const invoice = await api.post('/billing', {
+                    patient_id: patientId,
+                    amount: total,
+                    description: `Facturation automatique - ${notInvoiced.length} prescription(s)`,
+                    items: items,
+                    status: 'unpaid',
+                    source: 'auto',
+                    invoice_number: `AUTO-${Date.now()}`
+                });
+
+                // Mettre à jour le compte patient
+                await api.post('/billing/accounts/update', {
+                    patient_id: patientId,
+                    amount: total,
+                    type: 'debit'
+                });
+
+                showToast(`Facture auto générée: ${formatMoney(total)}`, 'success');
+                loadPage('billing');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        // ==================== PATIENT ACCOUNT ====================
+        async function patientAccountPage(c) {
+            try {
+                const accounts = await api.get('/billing/accounts').catch(() => []);
+                patientAccountsCache = accounts;
+
+                const totalDebt = accounts.reduce((s, a) => s + (a.balance > 0 ? a.balance : 0), 0);
+                const totalCredit = accounts.reduce((s, a) => s + (a.balance < 0 ? Math.abs(a.balance) : 0), 0);
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-wallet"></i> Comptes patients</h1></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${accounts.length}</div><div class="stat-label">Total comptes</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalDebt)}</div><div class="stat-label">Dettes totales</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalCredit)}</div><div class="stat-label">Crédits totaux</div></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Patient</th><th>Solde</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody>${accounts.map(a => {
+                                const patient = patientsCache.find(p => p.id === a.patient_id);
+                                const balanceClass = a.balance > 0 ? 'balance-negative' : a.balance < 0 ? 'balance-positive' : 'balance-zero';
+                                return `
+                                <tr>
+                                    <td><strong>${escapeHtml(patient?.full_name || 'Patient inconnu')}</strong></td>
+                                    <td class="${balanceClass}">${formatMoney(a.balance)}</td>
+                                    <td><span class="badge badge-${a.balance > 0 ? 'danger' : a.balance < 0 ? 'success' : 'secondary'}">${a.balance > 0 ? 'Débiteur' : a.balance < 0 ? 'Créditeur' : 'Soldé'}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="viewPatientAccountDetail(${a.patient_id})"><i class="fas fa-eye"></i> Détail</button>
+                                        <button class="btn btn-sm btn-success" onclick="addPaymentToAccount(${a.patient_id})"><i class="fas fa-plus"></i> Paiement</button>
+                                    </td>
+                                </tr>`;
+                            }).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        async function viewPatientAccountDetail(patientId) {
+            showLoading();
+            try {
+                const [account, transactions] = await Promise.all([
+                    api.get(`/billing/accounts/${patientId}`),
+                    api.get(`/billing/accounts/${patientId}/transactions`).catch(() => [])
+                ]);
+                const patient = patientsCache.find(p => p.id === patientId);
+                const balanceClass = account.balance > 0 ? 'balance-negative' : account.balance < 0 ? 'balance-positive' :
+                    'balance-zero';
+
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="accountDetailModal">
+                        <div class="modal-content" style="max-width:700px;">
+                            <div class="modal-header"><h3><i class="fas fa-wallet"></i> Compte de ${escapeHtml(patient?.full_name || patientId)}</h3><span class="close-modal" onclick="closeModal('accountDetailModal')">&times;</span></div>
+                            <div style="padding:16px;">
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                                    <div><strong>Solde:</strong> <span class="${balanceClass}">${formatMoney(account.balance)}</span></div>
+                                    <div><strong>ID Patient:</strong> #${patientId}</div>
+                                </div>
+                                <h4 style="margin-bottom:8px;">Historique des transactions</h4>
+                                <div class="table-container">
+                                    <table class="data-table">
+                                        <thead><tr><th>Date</th><th>Description</th><th>Montant</th><th>Type</th></tr></thead>
+                                        <tbody>${transactions.map(t => `
+                                            <tr>
+                                                <td>${formatDate(t.created_at)}</td>
+                                                <td>${escapeHtml(t.description)}</td>
+                                                <td class="${t.type === 'debit' ? 'balance-negative' : 'balance-positive'}">${formatMoney(t.amount)}</td>
+                                                <td><span class="badge badge-${t.type === 'debit' ? 'danger' : 'success'}">${t.type === 'debit' ? 'Débit' : 'Crédit'}</span></td>
+                                            </tr>
+                                        `).join('')}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function addPaymentToAccount(patientId) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="paymentModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-plus"></i> Ajouter un paiement</h3><span class="close-modal" onclick="closeModal('paymentModal')">&times;</span></div>
+                        <form onsubmit="processPaymentToAccount(event, ${patientId})" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Montant *</label><input type="number" class="form-control" id="paymentAmount" required min="0.01" step="0.01"></div>
+                            <div class="form-group"><label class="form-label">Description</label><input type="text" class="form-control" id="paymentDescription" placeholder="Paiement partiel, avance, etc."></div>
+                            <button type="submit" class="btn btn-success btn-full"><i class="fas fa-check"></i> Enregistrer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function processPaymentToAccount(e, patientId) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const amount = parseFloat(document.getElementById('paymentAmount').value) || 0;
+                const description = sanitizeInput(document.getElementById('paymentDescription').value) || 'Paiement';
+
+                if (amount <= 0) throw new Error('Montant invalide');
+
+                await api.post('/billing/accounts/update', {
+                    patient_id: patientId,
+                    amount: amount,
+                    type: 'credit',
+                    description: description
+                });
+
+                showToast('Paiement enregistré', 'success');
+                closeModal('paymentModal');
+                loadPage('patient-account');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        function viewPatientAccount(patientId) {
+            loadPage('patient-account');
+            // On pourrait filtrer directement mais on recharge la page
+            setTimeout(() => {
+                const rows = document.querySelectorAll('#pageContent table tbody tr');
+                rows.forEach(row => {
+                    const patientName = row.querySelector('td:first-child')?.textContent;
+                    const patient = patientsCache.find(p => p.id === patientId);
+                    if (patient && !patientName.includes(patient.full_name)) {
+                        row.style.display = 'none';
+                    }
+                });
+            }, 300);
+        }
+
+        // ==================== INVOICE FUNCTIONS ====================
+        function showAddInvoiceModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addInvoiceModal">
+                    <div class="modal-content" style="max-width:600px;">
+                        <div class="modal-header"><h3><i class="fas fa-file-invoice"></i> Nouvelle facture</h3><span class="close-modal" onclick="closeModal('addInvoiceModal')">&times;</span></div>
+                        <form onsubmit="createInvoice(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Patient *</label><select class="form-control" id="iPatient" required><option value="">Sélectionner</option>${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}</select></div>
+                            <div class="form-group"><label class="form-label">Montant (${CONFIG.CURRENCY}) *</label><input type="number" class="form-control" id="iAmount" required min="0" step="0.01"></div>
+                            <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="iDescription" rows="3"></textarea></div>
+                            <div class="form-group"><label class="form-label">Abonné</label><select class="form-control" id="iSubscriber"><option value="">Aucun</option>${subscribersCache.map(s => `<option value="${s.id}">${escapeHtml(s.name)} (${s.coverage_rate}%)</option>`).join('')}</select></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createInvoice(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const patientId = document.getElementById('iPatient').value;
+                const amount = parseFloat(document.getElementById('iAmount').value) || 0;
+                const description = sanitizeInput(document.getElementById('iDescription').value);
+                const subscriberId = document.getElementById('iSubscriber').value;
+
+                await api.post('/billing', {
+                    patient_id: patientId,
+                    amount: amount,
+                    description: description || 'Prestation médicale',
+                    subscriber_id: subscriberId || null,
+                    status: 'unpaid'
+                });
+
+                // Mettre à jour le compte patient
+                await api.post('/billing/accounts/update', {
+                    patient_id: patientId,
+                    amount: amount,
+                    type: 'debit',
+                    description: description || 'Prestation médicale'
+                });
+
+                showToast('Facture créée', 'success');
+                closeModal('addInvoiceModal');
+                loadPage('billing');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function payInvoice(id) {
+            if (!confirm('Marquer cette facture comme payée ?')) return;
+            showLoading();
+            try {
+                const invoice = invoicesCache.find(i => i.id === id);
+                if (!invoice) throw new Error('Facture introuvable');
+
+                await api.patch(`/billing/${id}`, { status: 'paid' });
+
+                // Créditer le compte patient
+                await api.post('/billing/accounts/update', {
+                    patient_id: invoice.patient_id,
+                    amount: invoice.amount,
+                    type: 'credit',
+                    description: `Paiement facture ${invoice.invoice_number || invoice.id}`
+                });
+
+                showToast('Facture payée', 'success');
+                loadPage('billing');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function viewInvoice(id) {
+            try {
+                const invoice = invoicesCache.find(i => i.id === id);
+                if (!invoice) return showToast('Facture introuvable', 'error');
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="viewInvoiceModal">
+                        <div class="modal-content" style="max-width:600px;">
+                            <div class="modal-header"><h3><i class="fas fa-file-invoice"></i> Facture ${escapeHtml(invoice.invoice_number || `FAC-${invoice.id}`)}</h3><span class="close-modal" onclick="closeModal('viewInvoiceModal')">&times;</span></div>
+                            <div style="padding:16px;">
+                                <p><strong>Patient:</strong> ${escapeHtml(invoice.patient_name)}</p>
+                                <p><strong>Montant:</strong> ${formatMoney(invoice.amount)}</p>
+                                <p><strong>Statut:</strong> <span class="badge badge-${invoice.status === 'paid' ? 'success' : 'danger'}">${invoice.status === 'paid' ? 'Payée' : 'Impayée'}</span></p>
+                                <p><strong>Date:</strong> ${formatDate(invoice.created_at)}</p>
+                                ${invoice.description ? `<p><strong>Description:</strong> ${escapeHtml(invoice.description)}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function exportInvoicePDF(id) {
+            const invoice = invoicesCache.find(i => i.id === id);
+            if (!invoice) return showToast('Facture introuvable', 'error');
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>Facture ${invoice.invoice_number || `FAC-${invoice.id}`}</title>
+                <style>
+                    body { font-family: Arial; padding: 40px; }
+                    .header { text-align: center; border-bottom: 3px solid #0a5c7e; padding-bottom: 10px; margin-bottom: 20px; }
+                    .header h1 { color: #0a5c7e; }
+                    .infos { margin: 20px 0; padding: 10px; background: #f8fafc; border-radius: 6px; }
+                    .total { font-size: 20px; font-weight: 700; text-align: right; margin-top: 20px; border-top: 2px solid #0a5c7e; padding-top: 10px; }
+                    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+                    @media print { body { padding: 20px; } }
+                </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🏥 ${CONFIG.HOSPITAL_NAME}</h1>
+                        <p>📞 ${CONFIG.HOSPITAL_PHONE} • ✉️ ${CONFIG.HOSPITAL_EMAIL}</p>
+                        <h2>Facture ${escapeHtml(invoice.invoice_number || `FAC-${invoice.id}`)}</h2>
+                    </div>
+                    <div class="infos">
+                        <p><strong>Patient:</strong> ${escapeHtml(invoice.patient_name)}</p>
+                        <p><strong>Date:</strong> ${formatDate(invoice.created_at)}</p>
+                        <p><strong>Statut:</strong> ${invoice.status === 'paid' ? 'Payée' : 'Impayée'}</p>
+                    </div>
+                    <div class="total">Total: ${formatMoney(invoice.amount)}</div>
+                    ${invoice.description ? `<p><strong>Description:</strong> ${escapeHtml(invoice.description)}</p>` : ''}
+                    <div class="footer">Document généré par I Hub</div>
+                    <script>setTimeout(() => window.print(), 500);<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
+        // ==================== TARIFFS ====================
+        function showTariffModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="tariffModal">
+                    <div class="modal-content" style="max-width:700px;">
+                        <div class="modal-header"><h3><i class="fas fa-tags"></i> Grille tarifaire</h3><span class="close-modal" onclick="closeModal('tariffModal')">&times;</span></div>
+                        <div style="padding:16px;">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead><tr><th>Acte</th><th>Catégorie</th><th>Prix (USD)</th><th>Prix (FC)</th></tr></thead>
+                                    <tbody>${tariffsCache.map(t => `
+                                        <tr>
+                                            <td><strong>${escapeHtml(t.label)}</strong></td>
+                                            <td>${escapeHtml(t.category || '—')}</td>
+                                            <td>${t.price_usd || 0} $</td>
+                                            <td>${t.price_fc ? formatMoney(t.price_fc) : '—'}</td>
+                                        </tr>
+                                    `).join('')}</tbody>
+                                </table>
+                            </div>
+                            <button class="btn btn-primary" onclick="showAddTariffItem()"><i class="fas fa-plus"></i> Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
+        function showAddTariffItem() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addTariffItemModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-plus"></i> Ajouter tarif</h3><span class="close-modal" onclick="closeModal('addTariffItemModal')">&times;</span></div>
+                        <form onsubmit="createTariffItem(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Acte *</label><input type="text" class="form-control" id="tLabel" required></div>
+                            <div class="form-group"><label class="form-label">Catégorie</label><select class="form-control" id="tCategory"><option value="Consultation">Consultation</option><option value="Laboratoire">Laboratoire</option><option value="Imagerie">Imagerie</option><option value="Soins">Soins</option><option value="Pharmacie">Pharmacie</option><option value="Autre">Autre</option></select></div>
+                            <div class="form-group"><label class="form-label">Prix (USD)</label><input type="number" class="form-control" id="tPriceUsd" step="0.01" value="0"></div>
+                            <div class="form-group"><label class="form-label">Prix (${CONFIG.CURRENCY})</label><input type="number" class="form-control" id="tPriceFc" step="0.01" value="0"></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Ajouter</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createTariffItem(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.post('/tariffs', {
+                    label: sanitizeInput(document.getElementById('tLabel').value),
+                    category: document.getElementById('tCategory').value,
+                    price_usd: parseFloat(document.getElementById('tPriceUsd').value) || 0,
+                    price_fc: parseFloat(document.getElementById('tPriceFc').value) || 0
+                });
+                showToast('Tarif ajouté', 'success');
+                closeModal('addTariffItemModal');
+                closeModal('tariffModal');
+                loadPage('billing');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        // ==================== SUBSCRIBERS ====================
+        async function subscribersPage(c) {
+            try {
+                const subscribers = await api.get('/subscribers').catch(() => []);
+                subscribersCache = subscribers;
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-handshake"></i> Abonnés</h1><button class="btn btn-primary" onclick="showAddSubscriberModal()"><i class="fas fa-plus"></i> Nouvel abonné</button></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Nom</th><th>Type</th><th>Taux de couverture</th><th>Actifs</th><th>Actions</th></tr></thead><tbody>${subscribers.map(s => `
+                        <tr>
+                            <td><strong>${escapeHtml(s.name)}</strong></td>
+                            <td>${escapeHtml(s.type || 'Mutuelle')}</td>
+                            <td>${s.coverage_rate || 0}%</td>
+                            <td>${s.active ? '✅ Oui' : '❌ Non'}</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="editSubscriber(${s.id})"><i class="fas fa-edit"></i></button></td>
+                        </tr>
+                    `).join('')}</tbody></table></div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function showAddSubscriberModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addSubscriberModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-handshake"></i> Nouvel abonné</h3><span class="close-modal" onclick="closeModal('addSubscriberModal')">&times;</span></div>
+                        <form onsubmit="createSubscriber(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Nom *</label><input type="text" class="form-control" id="sName" required></div>
+                            <div class="form-group"><label class="form-label">Type</label><select class="form-control" id="sType"><option value="Mutuelle">Mutuelle</option><option value="Assurance">Assurance</option><option value="Convention">Convention</option></select></div>
+                            <div class="form-group"><label class="form-label">Taux de couverture (%)</label><input type="number" class="form-control" id="sCoverage" min="0" max="100" value="80"></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createSubscriber(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.post('/subscribers', {
+                    name: sanitizeInput(document.getElementById('sName').value),
+                    type: document.getElementById('sType').value,
+                    coverage_rate: parseFloat(document.getElementById('sCoverage').value) || 80,
+                    active: true
+                });
+                showToast('Abonné créé', 'success');
+                closeModal('addSubscriberModal');
+                loadPage('subscribers');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        async function editSubscriber(id) {
+            try {
+                const sub = subscribersCache.find(s => s.id === id);
+                if (!sub) return showToast('Abonné introuvable', 'error');
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="editSubscriberModal">
+                        <div class="modal-content" style="max-width:500px;">
+                            <div class="modal-header"><h3><i class="fas fa-edit"></i> Modifier abonné</h3><span class="close-modal" onclick="closeModal('editSubscriberModal')">&times;</span></div>
+                            <form onsubmit="updateSubscriber(event, ${id})" style="padding:16px;">
+                                <div class="form-group"><label class="form-label">Nom *</label><input type="text" class="form-control" id="esName" value="${escapeHtml(sub.name)}" required></div>
+                                <div class="form-group"><label class="form-label">Type</label><select class="form-control" id="esType"><option value="Mutuelle" ${sub.type === 'Mutuelle' ? 'selected' : ''}>Mutuelle</option><option value="Assurance" ${sub.type === 'Assurance' ? 'selected' : ''}>Assurance</option><option value="Convention" ${sub.type === 'Convention' ? 'selected' : ''}>Convention</option></select></div>
+                                <div class="form-group"><label class="form-label">Taux de couverture (%)</label><input type="number" class="form-control" id="esCoverage" value="${sub.coverage_rate || 80}" min="0" max="100"></div>
+                                <div class="form-group"><label class="form-label">Actif</label><select class="form-control" id="esActive"><option value="true" ${sub.active ? 'selected' : ''}>Oui</option><option value="false" ${!sub.active ? 'selected' : ''}>Non</option></select></div>
+                                <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Mettre à jour</button>
+                            </form>
+                        </div>
+                    </div>
+                `);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function updateSubscriber(e, id) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.put(`/subscribers/${id}`, {
+                    name: sanitizeInput(document.getElementById('esName').value),
+                    type: document.getElementById('esType').value,
+                    coverage_rate: parseFloat(document.getElementById('esCoverage').value) || 80,
+                    active: document.getElementById('esActive').value === 'true'
+                });
+                showToast('Abonné modifié', 'success');
+                closeModal('editSubscriberModal');
+                loadPage('subscribers');
+            } catch (e) { showToast(e.message, 'error'); } finally { hideLoading(); }
+        }
+
+        // ==================== REPORTS ====================
+        async function reportsPage(c) {
+            try {
+                const [patients, appointments, invoices] = await Promise.all([
+                    api.get('/patients').catch(() => []),
+                    api.get('/appointments').catch(() => []),
+                    api.get('/billing').catch(() => [])
+                ]);
+                const today = new Date().toISOString().split('T')[0];
+                const todayPatients = patients.filter(p => p.created_at?.startsWith(today));
+                const todayAppointments = appointments.filter(a => a.date?.startsWith(today));
+                const todayInvoices = invoices.filter(i => i.created_at?.startsWith(today));
+                const paidToday = todayInvoices.filter(i => i.status === 'paid');
+                const totalToday = paidToday.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-chart-bar"></i> Rapports</h1><button class="btn btn-primary" onclick="exportReportPDF()"><i class="fas fa-file-pdf"></i> Exporter PDF</button></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${patients.length}</div><div class="stat-label">Total patients</div></div>
+                        <div class="stat-card"><div class="stat-value">${todayPatients.length}</div><div class="stat-label">Patients aujourd'hui</div></div>
+                        <div class="stat-card"><div class="stat-value">${appointments.length}</div><div class="stat-label">Total RDV</div></div>
+                        <div class="stat-card"><div class="stat-value">${todayAppointments.length}</div><div class="stat-label">RDV aujourd'hui</div></div>
+                        <div class="stat-card"><div class="stat-value">${invoices.length}</div><div class="stat-label">Total factures</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalToday)}</div><div class="stat-label">Encaissé aujourd'hui</div></div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function exportReportPDF() {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+            const content = document.getElementById('pageContent');
+            printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>Rapport Réception</title>
+                <style>body{font-family:Arial;padding:40px;}h1{color:#0a5c7e;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{padding:10px;border:1px solid #ddd;text-align:left;}th{background:#0a5c7e;color:#fff;}@media print{body{padding:20px;}}</style></head><body>
+                <h1>Rapport Réception - ${CONFIG.HOSPITAL_NAME}</h1>
+                <p>Généré le ${new Date().toLocaleString('fr-FR')}</p>
+                ${content.innerHTML}
+                </body></html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 500);
+        }
+
+        // ==================== LOGOUT ====================
+        function logout() {
+            if (confirm('Se déconnecter ?')) { Storage.clear();
+                window.location.href = 'index.html'; }
+        }
+
+        // ==================== INIT ====================
+        function init() {
+            const token = Storage.get('token');
+            const user = Storage.get('user');
+            if (token && user) {
+                currentUser = user;
+                api = new API(CONFIG.API_URL);
+                document.getElementById('userInfo').innerHTML =
+                    `<strong>${escapeHtml(user.name)}</strong><br><small>${escapeHtml(getRoleLabel(user.role))}</small>`;
+                buildNav();
+                loadPage('dashboard');
+                setTimeout(() => document.getElementById('loadingOverlay').classList.remove('active'), 300);
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Exposer les fonctions globales
+        window.loadPage = loadPage;
+        window.logout = logout;
+        window.showToast = showToast;
+        window.closeModal = closeModal;
+        window.filterPatients = filterPatients;
+        window.viewPatient = viewPatient;
+        window.printPatientCard = printPatientCard;
+        window.editPatient = editPatient;
+        window.updatePatient = updatePatient;
+        window.showAddPatientModal = showAddPatientModal;
+        window.createPatient = createPatient;
+        window.showAddAppointmentModal = showAddAppointmentModal;
+        window.createAppointment = createAppointment;
+        window.updateAppointmentStatus = updateAppointmentStatus;
+        window.editAppointment = editAppointment;
+        window.updateAppointment = updateAppointment;
+        window.showAddInvoiceModal = showAddInvoiceModal;
+        window.createInvoice = createInvoice;
+        window.payInvoice = payInvoice;
+        window.viewInvoice = viewInvoice;
+        window.exportInvoicePDF = exportInvoicePDF;
+        window.autoGenerateInvoice = autoGenerateInvoice;
+        window.showTariffModal = showTariffModal;
+        window.showAddTariffItem = showAddTariffItem;
+        window.createTariffItem = createTariffItem;
+        window.showAddSubscriberModal = showAddSubscriberModal;
+        window.createSubscriber = createSubscriber;
+        window.editSubscriber = editSubscriber;
+        window.updateSubscriber = updateSubscriber;
+        window.exportReportPDF = exportReportPDF;
+        window.viewPatientAccount = viewPatientAccount;
+        window.viewPatientAccountDetail = viewPatientAccountDetail;
+        window.addPaymentToAccount = addPaymentToAccount;
+        window.processPaymentToAccount = processPaymentToAccount;
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Hub — Pharmacie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="logo.jpg">
+    <style>
+        /* ===== PANIER FLOATING EN BAS A DROITE ===== */
+        .cart-toggle {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0b1f33, #1a3a5c);
+            color: #fff;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(11,31,51,0.3);
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cart-toggle:hover { transform: scale(1.05); }
+        .cart-toggle .badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #dc2626;
+            color: #fff;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+        .cart-float {
+            position: fixed;
+            bottom: 95px;
+            right: 24px;
+            z-index: 9999;
+            width: 380px;
+            max-height: 520px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+            display: none;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .cart-float.open { display: flex; }
+        .cart-float .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #0b1f33, #0a1a2b);
+            color: #fff;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .cart-float .cart-header h3 { margin: 0; font-size: 15px; font-weight: 600; }
+        .cart-float .cart-header .badge { background: rgba(255,255,255,0.2); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: 11px; }
+        .cart-float .cart-body {
+            padding: 8px 12px;
+            overflow-y: auto;
+            flex: 1;
+            max-height: 300px;
+        }
+        .cart-float .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 4px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+        .cart-float .cart-item .item-info { flex: 1; }
+        .cart-float .cart-item .item-actions { display: flex; gap: 2px; align-items: center; }
+        .cart-float .cart-item .item-actions .btn { padding: 2px 6px; font-size: 11px; min-width: 24px; }
+        .cart-float .cart-footer {
+            padding: 10px 14px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            flex-shrink: 0;
+        }
+        .cart-float .cart-footer .total { font-size: 18px; font-weight: 700; color: #0b1f33; }
+        .cart-float .cart-footer .patient-select { margin-bottom: 6px; }
+        .cart-float .cart-footer .patient-select select { width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 13px; }
+        .cart-float .cart-footer .btn-group { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .cart-float .cart-footer .btn-group .btn { flex: 1; min-width: 60px; padding: 5px 8px; font-size: 11px; }
+        .cart-float .patient-type-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .cart-float .patient-type-badge.interne { background: #dbeafe; color: #1e40af; }
+        .cart-float .patient-type-badge.externe { background: #d1fae5; color: #065f46; }
+        .cart-float .patient-balance { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .cart-float .patient-balance strong { color: #0b1f33; }
+        .cart-empty-text { text-align: center; color: #94a3b8; padding: 20px 0; font-size: 14px; }
+
+        .cart-toggle.hidden { display: none; }
+
+        /* ===== MODAL VENTE RAPIDE ===== */
+        .quick-sell-modal .modal-content { max-width: 450px; }
+
+        @media (max-width: 768px) {
+            .cart-float { width: calc(100% - 32px); right: 16px; bottom: 80px; max-height: 400px; }
+            .cart-toggle { bottom: 16px; right: 16px; width: 48px; height: 48px; font-size: 18px; }
+            .cart-float .cart-body { max-height: 220px; }
+        }
+        @media (max-width: 480px) {
+            .cart-float { width: calc(100% - 16px); right: 8px; bottom: 72px; }
+            .cart-toggle { bottom: 12px; right: 12px; width: 44px; height: 44px; font-size: 16px; }
+            .cart-float .cart-body { max-height: 180px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOADING ===== -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <img src="logo.jpg" alt="I Hub" class="loading-logo">
+            <div class="loading-pulse"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== MOBILE MENU ===== -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <img src="logo.jpg" alt="I Hub" style="width:44px;height:44px;border-radius:12px;object-fit:contain;">
+                <div>
+                    <h2>I Hub</h2>
+                    <p id="userInfo">Chargement...</p>
+                </div>
+            </div>
+        </div>
+        <div id="navMenu"></div>
+        <div class="sidebar-footer">
+            <button class="btn btn-danger btn-sm btn-full" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main-content" id="mainContent">
+        <div id="pageContent"></div>
+    </main>
+
+    <!-- ===== PANIER FLOATING ===== -->
+    <button class="cart-toggle" id="cartToggle" onclick="toggleCart()">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="badge" id="cartCount">0</span>
+    </button>
+
+    <div class="cart-float" id="cartFloat">
+        <div class="cart-header" onclick="toggleCart()">
+            <h3><i class="fas fa-shopping-cart"></i> Panier</h3>
+            <span class="badge" id="cartHeaderCount">0 articles</span>
+        </div>
+        <div class="cart-body" id="cartBody">
+            <div class="cart-empty-text" id="cartEmpty">Panier vide</div>
+            <div id="cartItems"></div>
+        </div>
+        <div class="cart-footer" id="cartFooter">
+            <div class="patient-select">
+                <select id="cartPatientSelect" onchange="updateCartPatient()">
+                    <option value="">Sélectionner un patient</option>
+                </select>
+            </div>
+            <div id="patientInfoDisplay" style="display:none;margin-bottom:4px;">
+                <span class="patient-type-badge" id="patientTypeBadge">Interne</span>
+                <div class="patient-balance" id="patientBalanceDisplay">Solde: <strong>0 Fc</strong></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span class="total">Total: <span id="cartTotal">0 Fc</span></span>
+            </div>
+            <div class="btn-group" id="cartButtons" style="display:none;">
+                <button class="btn btn-success btn-sm" onclick="checkoutCart('interne')" id="btnInterne">
+                    <i class="fas fa-user-check"></i> Compte patient
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="checkoutCart('externe')" id="btnExterne">
+                    <i class="fas fa-cash-register"></i> Caisse
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="clearCart()"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIG ====================
+        const CONFIG = {
+            API_URL: 'https://jokair.onrender.com/api',
+            APP_NAME: 'I-Hub',
+            HOSPITAL_NAME: 'I Hub',
+            HOSPITAL_PHONE: '+243 974 336 700',
+            HOSPITAL_EMAIL: 'jeremyodimba322@gmail.com',
+            CURRENCY: 'Fc'
+        };
+
+        // ==================== STORAGE ====================
+        class Storage {
+            static get(k) { try { const s = sessionStorage.getItem(k); if (s !== null) return JSON.parse(s); const l = localStorage.getItem(k); return l ? JSON.parse(l) : null; } catch { return null; } }
+            static set(k, v) { sessionStorage.setItem(k, JSON.stringify(v)); localStorage.setItem(k, JSON.stringify(v)); }
+            static clear() { sessionStorage.clear(); localStorage.clear(); }
+        }
+
+        // ==================== API ====================
+        class API {
+            constructor(url) { this.url = url; }
+            async request(endpoint, options = {}) {
+                const token = Storage.get('token');
+                const headers = { ...options.headers };
+                if (!(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                try {
+                    const res = await fetch(`${this.url}${endpoint}`, { ...options, headers, credentials: 'include' });
+                    if (res.status === 401) { this.logout(); throw new Error('Session expirée'); }
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || data.message || 'Erreur');
+                    return data;
+                } catch (e) { throw e; }
+            }
+            get(e) { return this.request(e, { method: 'GET' }); }
+            post(e, b) { return this.request(e, { method: 'POST', body: JSON.stringify(b) }); }
+            put(e, b) { return this.request(e, { method: 'PUT', body: JSON.stringify(b) }); }
+            patch(e, b) { return this.request(e, { method: 'PATCH', body: JSON.stringify(b) }); }
+            delete(e) { return this.request(e, { method: 'DELETE' }); }
+            logout() { Storage.clear(); window.location.href = 'index.html'; }
+        }
+
+        let api = null, currentUser = null;
+        let patientsCache = [], stockCache = [], prescriptionsCache = [], movementsCache = [];
+        let pharmacyCart = { items: [], patientId: null };
+
+        // ==================== HELPERS ====================
+        function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+        function showToast(msg, type = 'info') {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+            t.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+        function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        function sanitizeInput(t) { if (!t) return ''; return String(t).replace(/[<>`]/g, '').trim(); }
+        function safeText(v, f = '—') { return v === null || v === undefined || v === '' ? f : v; }
+        function formatDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('fr-FR'); } catch { return d; } }
+        function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('fr-FR'); } catch { return d; } }
+        function formatMoney(v) { const a = Number(v || 0); return `${a.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${CONFIG.CURRENCY}`; }
+        function getRoleLabel(r) { const roles = { super_admin: 'Admin', pharmacie: 'Pharmacie', docteur: 'Médecin' }; return roles[r] || r; }
+        function getGreetingMessage() { const h = new Date().getHours(); if (h < 12) return 'Bonjour'; if (h < 18) return 'Bon après-midi'; return 'Bonsoir'; }
+        function formatShortTime() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+        function sortByDateDesc(arr, key = 'created_at') { return [...(arr || [])].sort((a, b) => new Date(b?.[key] || 0) - new Date(a?.[key] || 0)); }
+        function closeModal(id) { const m = document.getElementById(id); if (m) m.remove(); }
+        function closeSidebar() { document.getElementById('sidebar')?.classList.remove('mobile-open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+        function toggleSidebar() { const s = document.getElementById('sidebar'); const o = document.getElementById('sidebarOverlay'); if (!s || !o) return; s.classList.toggle('mobile-open'); o.classList.toggle('active', s.classList.contains('mobile-open')); }
+
+        function getCurrentRole() { return currentUser?.role || ''; }
+        function isAdmin() { return getCurrentRole() === 'super_admin'; }
+        function canAccessPage(id) { if (isAdmin()) return true; return (ROLE_PAGE_ACCESS[getCurrentRole()] || []).includes(id); }
+
+        // ==================== ROLE ACCESS ====================
+        const ROLE_PAGE_ACCESS = {
+            super_admin: ['dashboard', 'prescriptions', 'stock', 'external-sales', 'movements', 'reports'],
+            pharmacie: ['dashboard', 'prescriptions', 'stock', 'external-sales', 'movements', 'reports']
+        };
+
+        // ==================== NAVIGATION ====================
+        function buildNav() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord' },
+                { id: 'prescriptions', icon: 'fa-prescription-bottle', label: 'Ordonnances' },
+                { id: 'stock', icon: 'fa-boxes', label: 'Stock' },
+                { id: 'external-sales', icon: 'fa-store', label: 'Ventes externes' },
+                { id: 'movements', icon: 'fa-exchange-alt', label: 'Mouvements' },
+                { id: 'reports', icon: 'fa-chart-bar', label: 'Rapports' }
+            ];
+            const allowed = items.filter(i => canAccessPage(i.id));
+            menu.innerHTML = allowed.map(i => `<div class="nav-item" data-page="${i.id}" onclick="loadPage('${i.id}')"><i class="fas ${i.icon}"></i><span>${i.label}</span></div>`).join('');
+        }
+
+        // ==================== PAGE LOADER ====================
+        function loadPage(id) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const active = document.querySelector(`.nav-item[data-page="${id}"]`);
+            if (active) active.classList.add('active');
+            showLoading();
+            setTimeout(async () => {
+                try {
+                    const c = document.getElementById('pageContent');
+                    switch (id) {
+                        case 'dashboard': await dashboard(c); break;
+                        case 'prescriptions': await prescriptionsPage(c); break;
+                        case 'stock': await stockPage(c); break;
+                        case 'external-sales': await externalSales(c); break;
+                        case 'movements': await movementsPage(c); break;
+                        case 'reports': await reportsPage(c); break;
+                        default: c.innerHTML = '<div class="empty-state"><i class="fas fa-file"></i><p>Page en construction</p></div>';
+                    }
+                    updateCartUI();
+                } catch (e) { showToast(e.message || 'Erreur', 'error'); }
+                hideLoading();
+            }, 200);
+        }
+
+        // ==================== DASHBOARD ====================
+        async function dashboard(c) {
+            try {
+                const [patients, prescriptions, stock] = await Promise.all([
+                    api.get('/patients').catch(() => []),
+                    api.get('/prescriptions').catch(() => []),
+                    api.get('/pharmacy').catch(() => [])
+                ]);
+                patientsCache = patients;
+                prescriptionsCache = prescriptions;
+                stockCache = stock;
+
+                const pending = prescriptions.filter(p => p.status === 'pending' || p.status === 'active' || !p.status).length;
+                const lowStock = stock.filter(s => Number(s.quantity) <= Number(s.threshold || 0) && Number(s.quantity) > 0).length;
+                const outOfStock = stock.filter(s => Number(s.quantity) === 0).length;
+                const totalValue = stock.reduce((sum, s) => sum + (Number(s.quantity) * Number(s.purchase_price || 0)), 0);
+                const now = new Date();
+                const greeting = getGreetingMessage();
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1><span class="badge badge-info"><i class="far fa-calendar"></i> ${now.toLocaleDateString('fr-FR')}</span></div>
+                    <div class="dashboard-greeting-card"><div class="dashboard-greeting-copy"><h2>${greeting}, ${escapeHtml(currentUser?.name || 'Pharmacien')}</h2><p style="color:var(--gray-500);">Résumé de la pharmacie</p></div><div class="dashboard-time-card"><span style="font-size:12px;color:var(--gray-500);">Heure</span><strong>${formatShortTime()}</strong></div></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-prescription"></i></div><div class="stat-value">${pending}</div><div class="stat-label">Ordonnances en attente</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-pills"></i></div><div class="stat-value">${stock.length}</div><div class="stat-label">Médicaments en stock</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-value">${lowStock}</div><div class="stat-label">Stock bas</div></div>
+                        <div class="stat-card"><div class="stat-header"><i class="fas fa-times-circle"></i></div><div class="stat-value">${outOfStock}</div><div class="stat-label">Ruptures</div></div>
+                    </div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">Valeur du stock</div><div class="value">${formatMoney(totalValue)}</div></div>
+                        <div class="insight-card"><div class="label">Patients</div><div class="value">${patients.length}</div></div>
+                    </div>
+                    <div class="dashboard-card"><h3><i class="fas fa-prescription"></i> Dernières ordonnances</h3>
+                        ${pending ? `<div class="table-container"><table class="data-table"><thead><tr><th>Patient</th><th>Médicament</th><th>Date</th><th>Statut</th></tr></thead><tbody>${prescriptions.filter(p => p.status === 'pending' || !p.status).slice(0, 5).map(p => `<tr><td><strong>${escapeHtml(p.patient_name)}</strong></td><td>${escapeHtml(p.medication)}</td><td>${formatDate(p.created_at)}</td><td><span class="badge badge-warning">En attente</span></td></tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--gray-500);">Aucune ordonnance en attente</p>'}
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); c.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p></div>`; }
+        }
+
+        // ==================== PRESCRIPTIONS ====================
+        async function prescriptionsPage(c) {
+            try {
+                const [prescriptions, stock, patients] = await Promise.all([
+                    api.get('/prescriptions').catch(() => []),
+                    api.get('/pharmacy').catch(() => []),
+                    api.get('/patients').catch(() => [])
+                ]);
+                prescriptionsCache = prescriptions;
+                stockCache = stock;
+                patientsCache = patients;
+
+                const pending = prescriptions.filter(p => p.status === 'pending' || !p.status || p.status === 'active');
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-prescription-bottle"></i> Ordonnances</h1><span class="badge badge-${pending.length ? 'warning' : 'success'}">${pending.length} en attente</span></div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">En attente</div><div class="value">${pending.length}</div></div>
+                        <div class="insight-card"><div class="label">Servies</div><div class="value">${prescriptions.filter(p => p.status === 'completed' || p.status === 'served').length}</div></div>
+                        <div class="insight-card"><div class="label">Total</div><div class="value">${prescriptions.length}</div></div>
+                    </div>
+                    ${pending.length ? `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Patient</th><th>Médicament</th><th>Dosage</th><th>Fréquence</th><th>Date</th><th>Actions</th></tr></thead>
+                            <tbody>${pending.map(p => `
+                                <tr>
+                                    <td><strong>${escapeHtml(p.patient_name)}</strong></td>
+                                    <td>${escapeHtml(p.medication)}</td>
+                                    <td>${escapeHtml(p.dosage || '—')}</td>
+                                    <td>${escapeHtml(p.frequency || '—')}</td>
+                                    <td>${formatDate(p.created_at)}</td>
+                                    <td><button class="btn btn-sm btn-success" onclick="servePrescription(${p.id})"><i class="fas fa-check"></i> Servir</button></td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>` : '<div class="empty-state"><i class="fas fa-check-circle"></i><p>Toutes les ordonnances ont été servies</p></div>'}
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== SERVE PRESCRIPTION ====================
+        async function servePrescription(id) {
+            const prescription = prescriptionsCache.find(p => p.id === id);
+            if (!prescription) return showToast('Ordonnance introuvable', 'error');
+
+            const stockItem = stockCache.find(s => s.medication_name.toLowerCase() === prescription.medication.toLowerCase());
+            if (!stockItem) return showToast('Médicament non trouvé en stock', 'error');
+            if (Number(stockItem.quantity) <= 0) return showToast('Stock insuffisant pour servir', 'error');
+
+            // Ajouter au panier
+            addToCart(stockItem.id, 1);
+
+            // Mettre à jour l'ordonnance
+            await api.patch(`/prescriptions/${id}`, { status: 'served' });
+
+            showToast('Ordonnance ajoutée au panier', 'success');
+            loadPage('prescriptions');
+        }
+
+        // ==================== STOCK ====================
+        async function stockPage(c) {
+            try {
+                const stock = await api.get('/pharmacy').catch(() => []);
+                stockCache = stock;
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-boxes"></i> Gestion du stock</h1><button class="btn btn-primary" onclick="showAddStockModal()"><i class="fas fa-plus"></i> Ajouter médicament</button></div>
+                    <div class="insight-strip">
+                        <div class="insight-card"><div class="label">Total</div><div class="value">${stock.length}</div></div>
+                        <div class="insight-card"><div class="label">Stock bas</div><div class="value">${stock.filter(s => Number(s.quantity) <= Number(s.threshold || 0) && Number(s.quantity) > 0).length}</div></div>
+                        <div class="insight-card"><div class="label">Ruptures</div><div class="value">${stock.filter(s => Number(s.quantity) === 0).length}</div></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Médicament</th><th>Quantité</th><th>Unité</th><th>Prix vente</th><th>Seuil</th><th>Expiration</th><th>Actions</th></tr></thead>
+                            <tbody>${stock.map(s => `
+                                <tr>
+                                    <td><strong>${escapeHtml(s.medication_name)}</strong></td>
+                                    <td style="${Number(s.quantity) <= Number(s.threshold || 0) && Number(s.quantity) > 0 ? 'color:var(--warning);font-weight:bold;' : ''}${Number(s.quantity) === 0 ? 'color:var(--danger);font-weight:bold;' : ''}">${s.quantity} ${Number(s.quantity) === 0 ? '❌' : Number(s.quantity) <= Number(s.threshold || 0) ? '⚠️' : ''}</td>
+                                    <td>${escapeHtml(s.unit || 'unité')}</td>
+                                    <td>${formatMoney(s.selling_price)}</td>
+                                    <td>${s.threshold || '—'}</td>
+                                    <td>${formatDate(s.expiry_date)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="editStock(${s.id})"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-warning" onclick="adjustStock(${s.id})"><i class="fas fa-sliders-h"></i></button>
+                                        <button class="btn btn-sm btn-secondary" onclick="addToCart(${s.id}, 1)"><i class="fas fa-cart-plus"></i> Panier</button>
+                                        <button class="btn btn-sm btn-success" onclick="showQuickSellModal(${s.id})"><i class="fas fa-bolt"></i> Vendre</button>
+                                    </td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== ADD STOCK ====================
+        function showAddStockModal() {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addStockModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-plus"></i> Ajouter médicament</h3><span class="close-modal" onclick="closeModal('addStockModal')">&times;</span></div>
+                        <form onsubmit="createStockItem(event)" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Nom *</label><input type="text" class="form-control" id="stockName" required></div>
+                            <div class="form-group"><label class="form-label">Quantité *</label><input type="number" class="form-control" id="stockQuantity" required min="0"></div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Unité</label><select class="form-control" id="stockUnit"><option value="comprimé(s)">Comprimé(s)</option><option value="gélule(s)">Gélule(s)</option><option value="ml">ml</option><option value="mg">mg</option><option value="boîte(s)">Boîte(s)</option></select></div>
+                                <div class="form-group"><label class="form-label">Seuil critique</label><input type="number" class="form-control" id="stockThreshold" value="10"></div>
+                            </div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Prix d'achat</label><input type="number" class="form-control" id="stockPurchasePrice" min="0" step="0.01"></div>
+                                <div class="form-group"><label class="form-label">Prix de vente *</label><input type="number" class="form-control" id="stockSellingPrice" required min="0.01" step="0.01"></div>
+                            </div>
+                            <div class="form-group"><label class="form-label">Date d'expiration</label><input type="date" class="form-control" id="stockExpiry"></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Ajouter</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function createStockItem(e) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.post('/pharmacy', {
+                    medication_name: sanitizeInput(document.getElementById('stockName').value),
+                    quantity: parseInt(document.getElementById('stockQuantity').value) || 0,
+                    unit: document.getElementById('stockUnit').value,
+                    threshold: parseInt(document.getElementById('stockThreshold').value) || 10,
+                    purchase_price: parseFloat(document.getElementById('stockPurchasePrice').value) || 0,
+                    selling_price: parseFloat(document.getElementById('stockSellingPrice').value) || 0,
+                    expiry_date: document.getElementById('stockExpiry').value || null
+                });
+                showToast('Médicament ajouté', 'success');
+                closeModal('addStockModal');
+                loadPage('stock');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== EDIT / ADJUST STOCK ====================
+        async function editStock(id) {
+            const item = stockCache.find(s => s.id === id);
+            if (!item) return showToast('Introuvable', 'error');
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="editStockModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-edit"></i> Modifier ${escapeHtml(item.medication_name)}</h3><span class="close-modal" onclick="closeModal('editStockModal')">&times;</span></div>
+                        <form onsubmit="updateStockItem(event, ${id})" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Nom</label><input type="text" class="form-control" id="editStockName" value="${escapeHtml(item.medication_name)}"></div>
+                            <div class="form-group"><label class="form-label">Quantité</label><input type="number" class="form-control" id="editStockQuantity" value="${item.quantity}"></div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Prix d'achat</label><input type="number" class="form-control" id="editStockPurchase" value="${item.purchase_price || 0}" step="0.01"></div>
+                                <div class="form-group"><label class="form-label">Prix de vente</label><input type="number" class="form-control" id="editStockSelling" value="${item.selling_price || 0}" step="0.01"></div>
+                            </div>
+                            <div class="form-group"><label class="form-label">Seuil</label><input type="number" class="form-control" id="editStockThreshold" value="${item.threshold || 10}"></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Mettre à jour</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function updateStockItem(e, id) {
+            e.preventDefault();
+            showLoading();
+            try {
+                await api.put(`/pharmacy/${id}`, {
+                    medication_name: sanitizeInput(document.getElementById('editStockName').value),
+                    quantity: parseInt(document.getElementById('editStockQuantity').value) || 0,
+                    purchase_price: parseFloat(document.getElementById('editStockPurchase').value) || 0,
+                    selling_price: parseFloat(document.getElementById('editStockSelling').value) || 0,
+                    threshold: parseInt(document.getElementById('editStockThreshold').value) || 10
+                });
+                showToast('Mise à jour effectuée', 'success');
+                closeModal('editStockModal');
+                loadPage('stock');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        async function adjustStock(id) {
+            const item = stockCache.find(s => s.id === id);
+            if (!item) return showToast('Introuvable', 'error');
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="adjustStockModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3><i class="fas fa-sliders-h"></i> Ajuster ${escapeHtml(item.medication_name)}</h3><span class="close-modal" onclick="closeModal('adjustStockModal')">&times;</span></div>
+                        <form onsubmit="processAdjustStock(event, ${id})" style="padding:16px;">
+                            <div class="form-group"><label class="form-label">Quantité actuelle: <strong>${item.quantity}</strong></label></div>
+                            <div class="form-group"><label class="form-label">Type *</label>
+                                <select class="form-control" id="adjustType" required>
+                                    <option value="add">Ajouter</option>
+                                    <option value="remove">Retirer</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Quantité *</label><input type="number" class="form-control" id="adjustQuantity" required min="1"></div>
+                            <div class="form-group"><label class="form-label">Raison</label><input type="text" class="form-control" id="adjustReason" placeholder="Correction, péremption, etc."></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Valider</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function processAdjustStock(e, id) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const type = document.getElementById('adjustType').value;
+                const quantity = parseInt(document.getElementById('adjustQuantity').value) || 0;
+                const reason = sanitizeInput(document.getElementById('adjustReason').value) || 'Ajustement manuel';
+
+                if (quantity <= 0) throw new Error('Quantité invalide');
+
+                await api.put(`/pharmacy/${id}/stock`, { quantity, operation: type, reason });
+                const item = stockCache.find(s => s.id === id);
+                await api.post('/pharmacy/movements', {
+                    medication_id: id,
+                    medication_name: item?.medication_name || 'Médicament',
+                    type: type === 'add' ? 'entree' : 'sortie',
+                    quantity,
+                    reason,
+                    source: 'ajustement'
+                });
+                showToast('Stock ajusté', 'success');
+                closeModal('adjustStockModal');
+                loadPage('stock');
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { hideLoading(); }
+        }
+
+        // ==================== VENTE RAPIDE ====================
+        function showQuickSellModal(medicationId) {
+            const item = stockCache.find(s => s.id === medicationId);
+            if (!item) return showToast('Médicament introuvable', 'error');
+            if (Number(item.quantity) <= 0) return showToast('Stock insuffisant', 'error');
+
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active quick-sell-modal" id="quickSellModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-bolt"></i> Vente rapide</h3>
+                            <span class="close-modal" onclick="closeModal('quickSellModal')">&times;</span>
+                        </div>
+                        <form onsubmit="processQuickSell(event, ${medicationId})" style="padding:16px;">
+                            <div class="form-group">
+                                <label class="form-label">Médicament</label>
+                                <input type="text" class="form-control" value="${escapeHtml(item.medication_name)} - ${formatMoney(item.selling_price)}" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Stock disponible: <strong>${item.quantity}</strong></label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Patient *</label>
+                                <select class="form-control" id="quickPatientId" required>
+                                    <option value="">Sélectionner</option>
+                                    ${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="modal-grid">
+                                <div class="form-group">
+                                    <label class="form-label">Quantité *</label>
+                                    <input type="number" class="form-control" id="quickQuantity" min="1" max="${item.quantity}" value="1" required onchange="updateQuickTotal()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Prix unitaire</label>
+                                    <input type="number" class="form-control" id="quickUnitPrice" value="${item.selling_price}" step="0.01" onchange="updateQuickTotal()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <strong>Total: <span id="quickTotal">${formatMoney(item.selling_price)}</span></strong>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Type de paiement *</label>
+                                <select class="form-control" id="quickPaymentType" required>
+                                    <option value="cash">Espèces</option>
+                                    <option value="card">Carte</option>
+                                    <option value="mobile">Mobile Money</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-full"><i class="fas fa-check"></i> Valider la vente</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+            updateQuickTotal();
+        }
+
+        function updateQuickTotal() {
+            const qty = parseInt(document.getElementById('quickQuantity').value) || 0;
+            const price = parseFloat(document.getElementById('quickUnitPrice').value) || 0;
+            const total = qty * price;
+            document.getElementById('quickTotal').textContent = formatMoney(total);
+        }
+
+        async function processQuickSell(e, medicationId) {
+            e.preventDefault();
+            showLoading();
+            try {
+                const patientId = document.getElementById('quickPatientId').value;
+                const quantity = parseInt(document.getElementById('quickQuantity').value) || 0;
+                const unitPrice = parseFloat(document.getElementById('quickUnitPrice').value) || 0;
+                const paymentType = document.getElementById('quickPaymentType').value;
+
+                if (!patientId) throw new Error('Patient requis');
+                if (quantity <= 0) throw new Error('Quantité invalide');
+                if (unitPrice <= 0) throw new Error('Prix invalide');
+
+                const med = stockCache.find(s => s.id === medicationId);
+                if (!med) throw new Error('Médicament introuvable');
+                if (quantity > Number(med.quantity)) throw new Error('Stock insuffisant');
+
+                // Décompte du stock
+                await api.put(`/pharmacy/${medicationId}/stock`, {
+                    quantity: quantity,
+                    operation: 'remove',
+                    reason: 'Vente rapide'
+                });
+
+                // Enregistrement du mouvement
+                await api.post('/pharmacy/movements', {
+                    medication_id: medicationId,
+                    medication_name: med.medication_name,
+                    type: 'sortie',
+                    quantity: quantity,
+                    reason: `Vente rapide - Patient #${patientId}`,
+                    patient_id: patientId
+                });
+
+                // Création de la facture
+                await api.post('/billing/grouped', {
+                    patient_id: patientId,
+                    source: 'pharmacy',
+                    description: `Vente rapide - ${med.medication_name} x${quantity}`,
+                    items: [{
+                        medication_id: medicationId,
+                        description: med.medication_name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        amount: quantity * unitPrice
+                    }],
+                    payment_type: paymentType,
+                    status: 'paid'
+                });
+
+                showToast('Vente rapide effectuée avec succès', 'success');
+                closeModal('quickSellModal');
+                loadPage('stock');
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== EXTERNAL SALES ====================
+        async function externalSales(c) {
+            try {
+                const stock = await api.get('/pharmacy').catch(() => []);
+                stockCache = stock;
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-store"></i> Ventes externes</h1></div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Produit</th><th>Stock</th><th>Prix</th><th>Actions</th></tr></thead>
+                            <tbody>${stock.map(s => `
+                                <tr>
+                                    <td><strong>${escapeHtml(s.medication_name)}</strong></td>
+                                    <td>${s.quantity}</td>
+                                    <td>${formatMoney(s.selling_price)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary" onclick="addToCart(${s.id}, 1)"><i class="fas fa-cart-plus"></i> Panier</button>
+                                        <button class="btn btn-sm btn-success" onclick="showQuickSellModal(${s.id})"><i class="fas fa-bolt"></i> Vendre</button>
+                                    </td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== MOVEMENTS ====================
+        async function movementsPage(c) {
+            try {
+                const movements = await api.get('/pharmacy/movements').catch(() => []);
+                movementsCache = sortByDateDesc(movements, 'created_at');
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-exchange-alt"></i> Registre des mouvements</h1></div>
+                    ${movementsCache.length ? `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Date</th><th>Médicament</th><th>Type</th><th>Quantité</th><th>Raison</th></tr></thead>
+                            <tbody>${movementsCache.map(m => `
+                                <tr>
+                                    <td>${fmtDate(m.created_at)}</td>
+                                    <td><strong>${escapeHtml(m.medication_name)}</strong></td>
+                                    <td><span class="badge badge-${m.type === 'entree' ? 'success' : 'danger'}">${m.type === 'entree' ? 'Entrée' : 'Sortie'}</span></td>
+                                    <td>${m.quantity}</td>
+                                    <td>${escapeHtml(m.reason || '—')}</td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>` : '<div class="empty-state"><i class="fas fa-exchange-alt"></i><p>Aucun mouvement enregistré</p></div>'}
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        // ==================== REPORTS ====================
+        async function reportsPage(c) {
+            try {
+                const [stock, movements] = await Promise.all([
+                    api.get('/pharmacy').catch(() => []),
+                    api.get('/pharmacy/movements').catch(() => [])
+                ]);
+
+                const totalValue = stock.reduce((sum, s) => sum + (Number(s.quantity) * Number(s.purchase_price || 0)), 0);
+                const totalSales = movements.filter(m => m.type === 'sortie').reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+                const totalEntries = movements.filter(m => m.type === 'entree').reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+
+                c.innerHTML = `
+                    <div class="page-header"><h1><i class="fas fa-chart-bar"></i> Rapports</h1><button class="btn btn-primary" onclick="exportReport()"><i class="fas fa-file-pdf"></i> Exporter PDF</button></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${stock.length}</div><div class="stat-label">Produits en stock</div></div>
+                        <div class="stat-card"><div class="stat-value">${formatMoney(totalValue)}</div><div class="stat-label">Valeur du stock</div></div>
+                        <div class="stat-card"><div class="stat-value">${totalEntries}</div><div class="stat-label">Entrées totales</div></div>
+                        <div class="stat-card"><div class="stat-value">${totalSales}</div><div class="stat-label">Sorties totales</div></div>
+                    </div>
+                    <div class="dashboard-card"><h3><i class="fas fa-boxes"></i> État du stock détaillé</h3>
+                        <div class="table-container"><table class="data-table"><thead><tr><th>Médicament</th><th>Quantité</th><th>Seuil</th><th>Statut</th></tr></thead><tbody>${stock.map(s => `
+                            <tr>
+                                <td><strong>${escapeHtml(s.medication_name)}</strong></td>
+                                <td>${s.quantity}</td>
+                                <td>${s.threshold || '—'}</td>
+                                <td>${Number(s.quantity) === 0 ? '<span class="badge badge-danger">Rupture</span>' : Number(s.quantity) <= Number(s.threshold || 0) ? '<span class="badge badge-warning">Stock bas</span>' : '<span class="badge badge-success">OK</span>'}</td>
+                            </tr>
+                        `).join('')}</tbody></table></div>
+                    </div>
+                `;
+            } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+        }
+
+        function exportReport() {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return showToast('Autorisez les popups', 'warning');
+            const content = document.getElementById('pageContent');
+            printWindow.document.write(`
+                <!DOCTYPE html><html><head><title>Rapport Pharmacie</title>
+                <style>body{font-family:Arial;padding:40px;}h1{color:#0a5c7e;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{padding:10px;border:1px solid #ddd;text-align:left;}th{background:#0a5c7e;color:#fff;}@media print{body{padding:20px;}}</style></head><body>
+                <h1>Rapport Pharmacie - ${CONFIG.HOSPITAL_NAME}</h1>
+                <p>Généré le ${new Date().toLocaleString('fr-FR')}</p>
+                ${content.innerHTML}
+                </body></html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 500);
+        }
+
+        // ==================== PANIER ====================
+        function addToCart(medicationId, quantity = 1) {
+            const item = stockCache.find(s => s.id === medicationId);
+            if (!item) return showToast('Médicament introuvable', 'error');
+            if (Number(item.quantity) < quantity) return showToast('Stock insuffisant', 'error');
+
+            const existing = pharmacyCart.items.find(i => i.id === medicationId);
+            if (existing) {
+                existing.quantity += quantity;
+            } else {
+                pharmacyCart.items.push({
+                    id: medicationId,
+                    name: item.medication_name,
+                    quantity: quantity,
+                    unitPrice: Number(item.selling_price || 0),
+                    stock: Number(item.quantity)
+                });
+            }
+
+            updateCartUI();
+            showToast(`${item.medication_name} ajouté au panier`, 'success');
+        }
+
+        function removeFromCart(index) {
+            pharmacyCart.items.splice(index, 1);
+            updateCartUI();
+        }
+
+        function updateCartQuantity(index, newQty) {
+            if (newQty <= 0) return removeFromCart(index);
+            const item = pharmacyCart.items[index];
+            if (item && newQty > item.stock) return showToast('Quantité supérieure au stock', 'error');
+            pharmacyCart.items[index].quantity = newQty;
+            updateCartUI();
+        }
+
+        function clearCart() {
+            if (!pharmacyCart.items.length) return;
+            if (!confirm('Vider le panier ?')) return;
+            pharmacyCart.items = [];
+            pharmacyCart.patientId = null;
+            document.getElementById('cartPatientSelect').value = '';
+            updateCartUI();
+            showToast('Panier vidé', 'info');
+        }
+
+        function toggleCart() {
+            const cart = document.getElementById('cartFloat');
+            const toggle = document.getElementById('cartToggle');
+            cart.classList.toggle('open');
+            if (cart.classList.contains('open')) {
+                toggle.style.display = 'none';
+                updateCartUI();
+            } else {
+                toggle.style.display = 'flex';
+            }
+        }
+
+        function getCartTotal() {
+            return pharmacyCart.items.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0);
+        }
+
+        function getCartCount() {
+            return pharmacyCart.items.reduce((sum, i) => sum + i.quantity, 0);
+        }
+
+        function updateCartUI() {
+            const count = getCartCount();
+            const total = getCartTotal();
+            const hasItems = pharmacyCart.items.length > 0;
+
+            document.getElementById('cartCount').textContent = count;
+            document.getElementById('cartHeaderCount').textContent = `${count} article${count > 1 ? 's' : ''}`;
+            document.getElementById('cartTotal').textContent = formatMoney(total);
+
+            const itemsContainer = document.getElementById('cartItems');
+            const emptyContainer = document.getElementById('cartEmpty');
+            const buttonsContainer = document.getElementById('cartButtons');
+
+            if (!hasItems) {
+                itemsContainer.innerHTML = '';
+                emptyContainer.style.display = 'block';
+                buttonsContainer.style.display = 'none';
+                document.getElementById('patientInfoDisplay').style.display = 'none';
+                return;
+            }
+
+            emptyContainer.style.display = 'none';
+            buttonsContainer.style.display = 'flex';
+
+            itemsContainer.innerHTML = pharmacyCart.items.map((item, index) => `
+                <div class="cart-item">
+                    <div class="item-info">
+                        <strong>${escapeHtml(item.name)}</strong>
+                        <div style="font-size:12px;color:#64748b;">
+                            ${item.quantity} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.quantity * item.unitPrice)}
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="updateCartQuantity(${index}, ${item.quantity - 1})"><i class="fas fa-minus"></i></button>
+                        <span style="padding:0 4px;min-width:20px;text-align:center;">${item.quantity}</span>
+                        <button class="btn btn-sm btn-secondary" onclick="updateCartQuantity(${index}, ${item.quantity + 1})"><i class="fas fa-plus"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Mettre à jour les patients
+            const patientSelect = document.getElementById('cartPatientSelect');
+            const currentVal = patientSelect.value;
+            patientSelect.innerHTML = `<option value="">Sélectionner un patient</option>${patientsCache.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}`;
+            if (currentVal) patientSelect.value = currentVal;
+
+            updatePatientInfo();
+        }
+
+        function updatePatientInfo() {
+            const patientId = document.getElementById('cartPatientSelect').value;
+            const display = document.getElementById('patientInfoDisplay');
+            if (!patientId) {
+                display.style.display = 'none';
+                document.getElementById('btnInterne').style.display = 'none';
+                document.getElementById('btnExterne').style.display = 'none';
+                return;
+            }
+
+            const patient = patientsCache.find(p => String(p.id) === String(patientId));
+            if (!patient) {
+                display.style.display = 'none';
+                return;
+            }
+
+            display.style.display = 'block';
+            const isInterne = patient.status === 'admitted' || patient.status === 'hospitalized' || patient.is_internal === true;
+            document.getElementById('patientTypeBadge').textContent = isInterne ? '🏥 Interne' : '🏠 Externe';
+            document.getElementById('patientTypeBadge').className = `patient-type-badge ${isInterne ? 'interne' : 'externe'}`;
+
+            if (isInterne) {
+                document.getElementById('patientBalanceDisplay').style.display = 'block';
+                // TODO: Appel API pour récupérer le solde
+                document.getElementById('patientBalanceDisplay').innerHTML = `Solde actuel: <strong>${formatMoney(0)}</strong>`;
+            } else {
+                document.getElementById('patientBalanceDisplay').style.display = 'none';
+            }
+
+            document.getElementById('btnInterne').style.display = isInterne ? 'inline-flex' : 'none';
+            document.getElementById('btnExterne').style.display = !isInterne ? 'inline-flex' : 'none';
+        }
+
+        function updateCartPatient() {
+            pharmacyCart.patientId = document.getElementById('cartPatientSelect').value;
+            updatePatientInfo();
+        }
+
+        async function checkoutCart(type) {
+            const patientId = document.getElementById('cartPatientSelect').value;
+            if (!patientId) return showToast('Sélectionnez un patient', 'warning');
+            if (!pharmacyCart.items.length) return showToast('Panier vide', 'warning');
+
+            showLoading();
+            try {
+                const items = pharmacyCart.items.map(i => ({
+                    medication_id: i.id,
+                    description: i.name,
+                    quantity: i.quantity,
+                    unit_price: i.unitPrice,
+                    amount: i.quantity * i.unitPrice
+                }));
+
+                if (type === 'interne') {
+                    await api.post('/billing/patient-account/add', {
+                        patient_id: patientId,
+                        source: 'pharmacy',
+                        description: 'Médicaments',
+                        items: items
+                    });
+                    showToast('✅ Montant ajouté au compte patient', 'success');
+                } else {
+                    await api.post('/billing/cashier', {
+                        patient_id: patientId,
+                        source: 'pharmacy',
+                        description: 'Vente pharmacie',
+                        items: items,
+                        payment_type: 'cash'
+                    });
+                    showToast('💳 Paiement en caisse enregistré', 'success');
+                }
+
+                // Décompte du stock
+                for (const item of pharmacyCart.items) {
+                    await api.put(`/pharmacy/${item.id}/stock`, {
+                        quantity: item.quantity,
+                        operation: 'remove',
+                        reason: `Vente panier - ${type === 'interne' ? 'interne' : 'externe'}`
+                    });
+                    await api.post('/pharmacy/movements', {
+                        medication_id: item.id,
+                        medication_name: item.name,
+                        type: 'sortie',
+                        quantity: item.quantity,
+                        reason: `Facturation panier - Patient #${patientId}`,
+                        patient_id: patientId
+                    });
+                }
+
+                pharmacyCart.items = [];
+                pharmacyCart.patientId = null;
+                document.getElementById('cartPatientSelect').value = '';
+                updateCartUI();
+
+                showToast('Panier facturé avec succès', 'success');
+                toggleCart();
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== LOGOUT ====================
+        function logout() {
+            if (confirm('Se déconnecter ?')) { Storage.clear(); window.location.href = 'index.html'; }
+        }
+
+        // ==================== INIT ====================
+        function init() {
+            const token = Storage.get('token');
+            const user = Storage.get('user');
+            if (token && user) {
+                currentUser = user;
+                api = new API(CONFIG.API_URL);
+                document.getElementById('userInfo').innerHTML = `<strong>${escapeHtml(user.name)}</strong><br><small>${escapeHtml(getRoleLabel(user.role))}</small>`;
+                buildNav();
+                loadPage('dashboard');
+
+                // Charger les patients pour le panier
+                api.get('/patients').then(patients => {
+                    patientsCache = patients;
+                    updateCartUI();
+                }).catch(() => {});
+
+                setTimeout(() => document.getElementById('loadingOverlay').classList.remove('active'), 300);
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Exposer les fonctions globales
+        window.loadPage = loadPage;
+        window.logout = logout;
+        window.showToast = showToast;
+        window.closeModal = closeModal;
+        window.toggleCart = toggleCart;
+        window.addToCart = addToCart;
+        window.removeFromCart = removeFromCart;
+        window.updateCartQuantity = updateCartQuantity;
+        window.clearCart = clearCart;
+        window.updateCartPatient = updateCartPatient;
+        window.checkoutCart = checkoutCart;
+        window.showQuickSellModal = showQuickSellModal;
+        window.updateQuickTotal = updateQuickTotal;
+        window.processQuickSell = processQuickSell;
+
+        window.showAddStockModal = showAddStockModal;
+        window.createStockItem = createStockItem;
+        window.editStock = editStock;
+        window.updateStockItem = updateStockItem;
+        window.adjustStock = adjustStock;
+        window.processAdjustStock = processAdjustStock;
+        window.servePrescription = servePrescription;
+        window.exportReport = exportReport;
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

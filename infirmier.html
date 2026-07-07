@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Hub — Infirmier</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="logo.jpg">
+</head>
+<body>
+
+    <!-- ===== LOADING OVERLAY ===== -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <img src="logo.jpg" alt="I Hub" class="loading-logo">
+            <div class="loading-pulse"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== MOBILE MENU BUTTON ===== -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Ouvrir le menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ===== SIDEBAR OVERLAY ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <img src="logo.jpg" alt="I Hub" style="width:48px;height:48px;border-radius:12px;object-fit:contain;">
+                <div>
+                    <h2 style="font-size:20px;margin:0;">I Hub</h2>
+                    <p id="userInfo" style="font-size:11px;margin:4px 0 0;">Chargement...</p>
+                </div>
+            </div>
+        </div>
+        <div class="nav-menu" id="navMenu"></div>
+        <div class="sidebar-footer" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.1);">
+            <button class="btn btn-danger btn-sm btn-full" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content" id="mainContent"></main>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            API_URL: 'https://jokair.onrender.com/api',
+            AI_API_URL: 'https://odimba-1.onrender.com/api/ai',
+            APP_NAME: 'I-Hub',
+            APP_VERSION: '1.0.0',
+            HOSPITAL_NAME: 'I Hub',
+            HOSPITAL_PHONE: '+243 974 336 700',
+            HOSPITAL_EMAIL: 'jeremyodimba322@gmail.com',
+            HOSPITAL_ADDRESS: '',
+            HOSPITAL_LOGO_URL: 'logo.jpg',
+            CURRENCY: 'Fc',
+            ITEMS_PER_PAGE: 20,
+            DEBUG: false
+        };
+
+        // ==================== STORAGE ====================
+        class SecureStorage {
+            static set(key, value, persistent = false) {
+                try {
+                    const target = persistent ? localStorage : sessionStorage;
+                    const secondary = persistent ? sessionStorage : localStorage;
+                    target.setItem(key, JSON.stringify(value));
+                    secondary.removeItem(key);
+                } catch(e) { console.error('Storage error:', e); }
+            }
+            static get(key) {
+                try {
+                    const sessionItem = sessionStorage.getItem(key);
+                    if (sessionItem !== null) return JSON.parse(sessionItem);
+                    const localItem = localStorage.getItem(key);
+                    return localItem ? JSON.parse(localItem) : null;
+                } catch(e) { return null; }
+            }
+            static remove(key) {
+                sessionStorage.removeItem(key);
+                localStorage.removeItem(key);
+            }
+            static clear() {
+                sessionStorage.clear();
+                localStorage.clear();
+            }
+        }
+
+        // ==================== API SERVICE ====================
+        class APIService {
+            constructor(baseURL) { this.baseURL = baseURL; }
+
+            async request(endpoint, options = {}, retries = 1) {
+                const token = SecureStorage.get('token');
+                const headers = { ...options.headers };
+                if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                    const response = await fetch(`${this.baseURL}${endpoint}`, {
+                        ...options,
+                        headers,
+                        credentials: 'include',
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (response.status === 401) { this.logout(); throw new Error('Session expirée. Veuillez vous reconnecter.'); }
+                    if (response.status === 403) throw new Error('Accès interdit. Permissions insuffisantes.');
+                    if (response.status === 404) throw new Error('Ressource introuvable.');
+                    if (response.status === 422) { const data = await response.json(); throw new Error(data.error || 'Données invalides.'); }
+                    if (response.status === 429) throw new Error('Trop de requêtes. Veuillez patienter.');
+                    if (response.status >= 500) {
+                        if (retries > 0) {
+                            await new Promise(r => setTimeout(r, 1000));
+                            return this.request(endpoint, options, retries - 1);
+                        }
+                        throw new Error('Erreur serveur. Réessayez plus tard.');
+                    }
+
+                    const responseType = response.headers.get('content-type') || '';
+                    let data = null;
+                    if (response.status !== 204 && response.status !== 205) {
+                        if (responseType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            data = text ? { message: text } : null;
+                        }
+                    }
+                    if (!response.ok) throw new Error(data?.error || data?.message || 'Erreur inconnue');
+                    return data;
+                } catch(error) {
+                    if (error.name === 'AbortError') throw new Error('Requête expirée. Vérifiez votre connexion.');
+                    if (error.message === 'Failed to fetch') throw new Error('Serveur indisponible. Vérifiez que le backend est démarré.');
+                    throw error;
+                }
+            }
+            get(endpoint) { return this.request(endpoint, { method: 'GET' }); }
+            post(endpoint, body) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); }
+            put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }); }
+            patch(endpoint, body) { return this.request(endpoint, { method: 'PATCH', body: JSON.stringify(body) }); }
+            delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); }
+            logout() { SecureStorage.clear(); window.location.href = 'index.html'; }
+        }
+
+        let api = null;
+        let currentUser = null;
+        let patientSearchTimer = null;
+        let patientsCache = [];
+        let appointmentsCache = [];
+        let boxData = { boxes: [], doctors: [] };
+
+        // ==================== HELPERS ====================
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        function sanitizeInput(input) {
+            if (input === null || input === undefined) return '';
+            return String(input)
+                .replace(/[\u0000-\u001F\u007F]/g, ' ')
+                .replace(/[<>`]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function safeText(value, fallback = '—') {
+            return value === null || value === undefined || value === '' ? fallback : String(value);
+        }
+
+        function normalizeEmail(value) {
+            return sanitizeInput(value).toLowerCase();
+        }
+
+        function isValidEmail(value) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+        }
+
+        function parseIntegerInput(value, fallback = NaN) {
+            const parsed = Number.parseInt(String(value), 10);
+            return Number.isInteger(parsed) ? parsed : fallback;
+        }
+
+        function parseAmountInput(value, fallback = NaN) {
+            const normalized = String(value ?? '').replace(',', '.').trim();
+            const parsed = Number.parseFloat(normalized);
+            return Number.isFinite(parsed) ? parsed : fallback;
+        }
+
+        function roundMoney(value) {
+            return Math.round((Number(value) || 0) * 100) / 100;
+        }
+
+        function assert(condition, message) {
+            if (!condition) throw new Error(message);
+        }
+
+        function formatDate(value, locale = 'fr-FR') {
+            if (!value) return '—';
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString(locale);
+        }
+
+        function formatDateTime(value, locale = 'fr-FR') {
+            if (!value) return '—';
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(locale);
+        }
+
+        function getGreetingMessage(date = new Date()) {
+            const hour = date.getHours();
+            if (hour < 12) return 'Bonjour';
+            if (hour < 18) return 'Bon après-midi';
+            return 'Bonsoir';
+        }
+
+        function formatShortTime(date = new Date(), locale = 'fr-FR') {
+            return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatMoney(value) {
+            const amount = Number(value || 0);
+            const currency = String(CONFIG.CURRENCY || 'Fc').replace(/[^p{L}p{N}.$€£¥-]/gu, '') || 'Fc';
+            const formatted = amount.toLocaleString('fr-FR', {
+                minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+                maximumFractionDigits: 2
+            }).replace(/[\u202F\u00A0]/g, ' ');
+            return `${formatted} ${currency}`;
+        }
+
+        function sortByDateDesc(items, key) {
+            return [...(items || [])].sort((a, b) => {
+                const left = new Date(a?.[key] || a?.created_at || 0).getTime();
+                const right = new Date(b?.[key] || b?.created_at || 0).getTime();
+                return right - left;
+            });
+        }
+
+        function getPatientStatusLabel(status) {
+            const labels = { active: 'Actif', admitted: 'Hospitalisé', discharged: 'Sorti' };
+            return labels[status] || safeText(status, 'Actif');
+        }
+
+        function getPatientStatusBadgeClass(status) {
+            if (status === 'admitted') return 'warning';
+            if (status === 'discharged') return 'info';
+            return 'success';
+        }
+
+        function getGenderLabel(gender) {
+            const labels = { M: 'Masculin', F: 'Féminin' };
+            return labels[gender] || safeText(gender, 'Non renseigné');
+        }
+
+        function getRoleLabel(role) {
+            const roles = {
+                'super_admin': 'Administrateur',
+                'docteur': 'Médecin',
+                'infirmier': 'Infirmière',
+                'laboratoire': 'Laboratoire',
+                'pharmacie': 'Pharmacie',
+                'reception': 'Réception'
+            };
+            return roles[role] || role;
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar')?.classList.remove('mobile-open');
+            document.getElementById('sidebarOverlay')?.classList.remove('active');
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar || !overlay) return;
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active', sidebar.classList.contains('mobile-open'));
+        }
+
+        function syncResponsiveChrome() {
+            const menuButton = document.getElementById('mobileMenuBtn');
+            if (!menuButton) return;
+            menuButton.style.display = currentUser && window.innerWidth <= 768 ? 'flex' : 'none';
+            if (window.innerWidth > 768) closeSidebar();
+        }
+
+        function getCurrentRole() {
+            return currentUser?.role || '';
+        }
+
+        function isAdmin() {
+            return getCurrentRole() === 'super_admin';
+        }
+
+        function canAccessPage(pageId) {
+            if (isAdmin()) return true;
+            return (ROLE_PAGE_ACCESS[getCurrentRole()] || []).includes(pageId);
+        }
+
+        function isOwnRecord(rec) {
+            const myId = String(currentUser?.id || '');
+            const myName = String(currentUser?.name || '').toLowerCase();
+            if (!myId && !myName) return true;
+            const idFields = ['assigned_doctor_id','doctor_id','practitioner_id','provider_id','prescriber_id','requested_by','created_by','user_id','assigned_to'];
+            if (myId && idFields.some(f => String(rec?.[f] || '') === myId)) return true;
+            const nameFields = ['doctor_name','practitioner_name','provider_name','prescriber_name','created_by_name','user_name','assigned_doctor_name'];
+            if (myName && nameFields.some(f => String(rec?.[f] || '').toLowerCase() === myName)) return true;
+            return false;
+        }
+
+        function isOwnAppointment(appointment) {
+            if (getCurrentRole() !== 'docteur') return true;
+            return isOwnRecord(appointment);
+        }
+
+        function filterAppointmentsForCurrentRole(appointments) {
+            const list = Array.isArray(appointments) ? appointments : [];
+            return list.filter(isOwnAppointment);
+        }
+
+        function patientInitials(name) {
+            const parts = String(name || 'Patient').trim().split(/\s+/).filter(Boolean);
+            return parts.slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('') || 'IH';
+        }
+
+        function truncateText(text, maxLength) {
+            if (!text) return '—';
+            return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+        }
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            try { return new Date(d).toLocaleString('fr-FR'); } catch { return d; }
+        }
+
+        // ==================== ROLE ACCESS ====================
+        const ROLE_PAGE_ACCESS = {
+            super_admin: ['dashboard', 'waiting-room', 'appointments', 'patients', 'care', 'boxes', 'reports'],
+            infirmier: ['dashboard', 'waiting-room', 'appointments', 'patients', 'care', 'boxes', 'reports']
+        };
+
+        // ==================== NAVIGATION ====================
+        function buildNavigation() {
+            const navMenu = document.getElementById('navMenu');
+            const navItems = [
+                { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', roles: ['super_admin', 'infirmier'] },
+                { id: 'waiting-room', icon: 'fa-clock', label: 'Salle d\'attente', roles: ['super_admin', 'infirmier'] },
+                { id: 'appointments', icon: 'fa-calendar-alt', label: 'Rendez-vous', roles: ['super_admin', 'infirmier'] },
+                { id: 'patients', icon: 'fa-users', label: 'Patients', roles: ['super_admin', 'infirmier'] },
+                { id: 'care', icon: 'fa-heartbeat', label: 'Soins', roles: ['super_admin', 'infirmier'] },
+                { id: 'boxes', icon: 'fa-hospital', label: 'Box Médecins', roles: ['super_admin', 'infirmier'] },
+                { id: 'reports', icon: 'fa-file-alt', label: 'Rapports', roles: ['super_admin', 'infirmier'] }
+            ];
+
+            const allowedItems = navItems.filter(item => item.roles.includes(currentUser.role));
+            navMenu.innerHTML = allowedItems.map(item => {
+                return `<div class="nav-item" data-page="${item.id}" onclick="loadPage('${item.id}', event)"><i class="fas ${item.icon}"></i><span>${item.label}</span></div>`;
+            }).join('');
+        }
+
+        // ==================== PAGE LOADER ====================
+        async function loadPage(pageId, event) {
+            const mainContent = document.getElementById('mainContent');
+            if (!canAccessPage(pageId)) {
+                mainContent.innerHTML = `
+                    <div class="empty-state" style="margin-top:40px;">
+                        <i class="fas fa-user-lock" style="font-size:48px;color:var(--warning);margin-bottom:16px;"></i>
+                        <h3 style="margin-bottom:10px;">Accès limité</h3>
+                        <p>Cette section n'est pas disponible pour votre rôle actuel.</p>
+                        <p style="margin-top:12px;"><span class="badge badge-info"><i class="fas fa-user-tag"></i> ${escapeHtml(getRoleLabel(currentUser?.role))}</span></p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            const activeItem = event?.target?.closest('.nav-item') || document.querySelector(`.nav-item[data-page="${pageId}"]`);
+            activeItem?.classList.add('active');
+
+            showLoading();
+            try {
+                switch (pageId) {
+                    case 'dashboard': await loadDashboardStats(); break;
+                    case 'waiting-room': await loadWaitingRoom(); break;
+                    case 'appointments': await loadAppointments(); break;
+                    case 'patients': await loadPatients(); break;
+                    case 'care': await loadCareCentral(); break;
+                    case 'boxes': await loadBoxManagement(); break;
+                    case 'reports': await loadReports(); break;
+                    default: mainContent.innerHTML = `<div class="empty-state"><h3>Page en construction</h3></div>`;
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+                mainContent.innerHTML = `
+                    <div class="empty-state" style="margin-top:40px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size:40px;color:var(--warning);margin-bottom:10px;"></i>
+                        <h3 style="margin-bottom:10px;">Erreur de chargement</h3>
+                        <p>${escapeHtml(error.message)}</p>
+                        <button class="btn btn-primary" onclick="loadPage('${pageId}')" style="margin-top:18px;"><i class="fas fa-sync-alt"></i> Réessayer</button>
+                    </div>
+                `;
+            } finally {
+                hideLoading();
+                closeSidebar();
+            }
+        }
+
+        // ==================== DASHBOARD ====================
+        function loadDashboard() {
+            const savedToken = SecureStorage.get('token');
+            const savedUser = SecureStorage.get('user');
+            if (savedToken && savedUser) currentUser = savedUser;
+            if (!currentUser) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('userInfo').innerHTML = `<strong>${escapeHtml(currentUser.name)}</strong><br><small>${escapeHtml(getRoleLabel(currentUser.role))}</small>`;
+            buildNavigation();
+            syncResponsiveChrome();
+            loadPage('dashboard');
+        }
+
+        // ==================== DASHBOARD STATS ====================
+        async function loadDashboardStats() {
+            const viewAppointments = canAccessPage('appointments');
+            const viewCare = canAccessPage('care');
+
+            const fetches = [
+                api.get('/patients'),
+                viewAppointments ? api.get('/appointments') : Promise.resolve([]),
+                viewCare ? api.get('/care') : Promise.resolve([]),
+                api.get('/workflow/queue').catch(()=>[]),
+                api.get('/workflow/doctors').catch(()=>[])
+            ];
+
+            const [patients, rawAppointments, careLogs, queue, doctors] = await Promise.all(fetches);
+            const appointments = viewAppointments ? filterAppointmentsForCurrentRole(rawAppointments) : [];
+
+            patientsCache = sortByDateDesc(patients, 'created_at');
+            const todayCare = viewCare ? careLogs.filter(c => new Date(c.date).toDateString() === new Date().toDateString()).length : 0;
+            const waitingCount = Array.isArray(queue) ? queue.length : 0;
+
+            const stats = [
+                { icon: 'fa-users', value: patients.length, label: 'Patients' },
+                { icon: 'fa-clock', value: waitingCount, label: 'En attente' },
+                { icon: 'fa-calendar-alt', value: appointments.length, label: 'Rendez-vous' },
+                { icon: 'fa-heartbeat', value: todayCare, label: 'Soins aujourd\'hui' }
+            ];
+
+            const dashboardNow = new Date();
+            const dashboardGreeting = getGreetingMessage(dashboardNow);
+            const dashboardTime = formatShortTime(dashboardNow);
+            const dashboardUserName = safeText(currentUser?.name, 'Utilisateur');
+
+            document.getElementById('mainContent').innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1>
+                    <div class="action-stack">
+                        <span class="badge badge-info"><i class="far fa-calendar"></i> ${new Date().toLocaleDateString('fr-FR')}</span>
+                    </div>
+                </div>
+                <section class="dashboard-greeting-card">
+                    <div class="dashboard-greeting-copy">
+                        <span class="dashboard-greeting-date"><i class="far fa-calendar"></i> ${dashboardNow.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+                        <h2>${dashboardGreeting}, ${escapeHtml(dashboardUserName)}</h2>
+                        <p>Voici votre résumé d'activité en temps réel.</p>
+                    </div>
+                    <div class="dashboard-time-card">
+                        <span>Heure actuelle</span>
+                        <strong>${dashboardTime}</strong>
+                        <small>${escapeHtml(getRoleLabel(currentUser?.role))}</small>
+                    </div>
+                </section>
+                <div class="stats-grid">
+                    ${stats.map(stat => `
+                        <div class="stat-card">
+                            <div class="stat-header"><i class="fas ${stat.icon}"></i></div>
+                            <div class="stat-value">${stat.value}</div>
+                            <div class="stat-label">${stat.label}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="dashboard-grid dashboard-records-grid">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-user-injured"></i> Derniers patients</h3>
+                        ${buildTableSection(
+                            ['Nom', 'Téléphone', 'Statut', 'Date'],
+                            patientsCache.slice(0, 6).map(patient => `
+                                <tr>
+                                    <td><strong>${escapeHtml(patient.full_name)}</strong></td>
+                                    <td>${escapeHtml(safeText(patient.phone))}</td>
+                                    <td><span class="badge badge-${getPatientStatusBadgeClass(patient.status)}">${escapeHtml(getPatientStatusLabel(patient.status))}</span></td>
+                                    <td>${formatDate(patient.created_at)}</td>
+                                </tr>
+                            `),
+                            'Aucun patient enregistré.'
+                        )}
+                    </div>
+                    ${viewCare ? `<div class="dashboard-card">
+                        <h3><i class="fas fa-notes-medical"></i> Derniers soins</h3>
+                        ${buildTableSection(
+                            ['Patient', 'Type', 'Date'],
+                            sortByDateDesc(careLogs, 'date').slice(0, 6).map(c => `
+                                <tr>
+                                    <td><strong>${escapeHtml(c.patient_name)}</strong></td>
+                                    <td><span class="badge badge-info">${escapeHtml(c.care_type)}</span></td>
+                                    <td>${formatDate(c.date)}</td>
+                                </tr>
+                            `),
+                            'Aucun soin enregistré.'
+                        )}
+                    </div>` : ''}
+                </div>
+            `;
+        }
+
+        function buildTableSection(headers, rowsMarkup, emptyMessage) {
+            if (!rowsMarkup.length) {
+                return `<div class="empty-state"><i class="fas fa-folder-open" style="font-size:20px;margin-bottom:8px;color:var(--primary);"></i><div>${emptyMessage}</div></div>`;
+            }
+            return `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr></thead>
+                        <tbody>${rowsMarkup.join('')}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // ==================== WAITING ROOM ====================
+        const workflowState = {
+            queue: [],
+            vitals: [],
+            doctors: []
+        };
+
+        function hasVitalsFor(patientId) {
+            return workflowState.vitals.some(v => String(v.patient_id || v.patient?.id) === String(patientId));
+        }
+
+        function getTriageColor(vitals) {
+            if (!vitals) return 'green';
+            const temp = parseFloat(vitals.temperature);
+            const hr = parseInt(vitals.heart_rate);
+            const spo2 = parseFloat(vitals.oxygen_saturation);
+            if ((temp && temp > 39) || (hr && hr > 120) || (spo2 && spo2 < 90)) return 'red';
+            if ((temp && temp > 38.5) || (hr && hr > 100) || (spo2 && spo2 < 94)) return 'orange';
+            return 'green';
+        }
+
+        function getTriageLabel(color) {
+            const labels = { red: 'Urgent', orange: 'Modéré', green: 'Stable' };
+            return labels[color] || 'Stable';
+        }
+
+        function statusBadge(s) {
+            const statusMap = {
+                waiting: { label: 'En attente', color: 'warning' },
+                assigned: { label: 'Assigné', color: 'info' },
+                in_consultation: { label: 'En consultation', color: 'info' },
+                hospitalized: { label: 'Hospitalisé', color: 'danger' },
+                discharged: { label: 'Sorti', color: 'success' },
+                with_nurse: { label: 'Avec infirmier', color: 'primary' }
+            };
+            const info = statusMap[s] || { label: s || '—', color: 'secondary' };
+            return `<span class="badge badge-${info.color}">${info.label}</span>`;
+        }
+
+        async function loadWaitingRoom() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <div><h1><i class="fas fa-clock"></i> Salle d'attente</h1><p>Patients présents en attente de consultation</p></div>
+                    <button class="btn btn-primary" onclick="showAddUrgentPatient()"><i class="fas fa-plus"></i> Urgence sans RDV</button>
+                </div>
+                <div id="waitingRoomContainer"><div class="loading-spinner"></div></div>
+            `;
+            try {
+                const [queue, vitals, doctors] = await Promise.all([
+                    api.get('/workflow/queue'),
+                    api.get('/workflow/vitals').catch(()=>[]),
+                    api.get('/workflow/doctors').catch(()=>[])
+                ]);
+                workflowState.queue = Array.isArray(queue) ? queue : (queue?.items || []);
+                workflowState.vitals = Array.isArray(vitals) ? vitals : (vitals?.items || []);
+                workflowState.doctors = Array.isArray(doctors) ? doctors : (doctors?.items || []);
+                renderWaitingRoomTable();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            }
+        }
+
+        function renderWaitingRoomTable() {
+            const c = document.getElementById('waitingRoomContainer');
+            if (!c) return;
+            if (!workflowState.queue.length) {
+                c.innerHTML = `<div class="empty-state"><i class="fas fa-clock"></i><p>Aucun patient en salle d'attente</p></div>`;
+                return;
+            }
+            c.innerHTML = `
+                <div class="filters-row">
+                    <input class="form-control" id="waitingRoomSearch" placeholder="🔍 Rechercher patient..." oninput="filterWaitingRoom(this.value)">
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>#</th><th>Patient</th><th>RDV</th><th>Triage</th><th>Statut</th>
+                            <th>Actions</th>
+                        </tr></thead>
+                        <tbody id="waitingRoomTbody">
+                            ${workflowState.queue.map((q, i) => rowWaitingRoom(q, i)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function rowWaitingRoom(q, i) {
+            const pid = q.patient_id || q.id;
+            const pname = q.patient_name || q.patient?.name || '—';
+            const hasVitals = hasVitalsFor(pid);
+            const vitals = workflowState.vitals.find(v => String(v.patient_id || v.patient?.id) === String(pid));
+            const triageColor = getTriageColor(vitals);
+            const triageLabel = getTriageLabel(triageColor);
+
+            return `<tr>
+                <td>${q.order ?? (i+1)}</td>
+                <td><strong>${escapeHtml(pname)}</strong></td>
+                <td>${q.appointment_time ? fmtDate(q.appointment_time) : '—'}</td>
+                <td>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:600;background:${triageColor === 'red' ? '#fee2e2' : triageColor === 'orange' ? '#ffedd5' : '#dcfce7'};color:${triageColor === 'red' ? '#dc2626' : triageColor === 'orange' ? '#d97706' : '#16a34a'};">
+                        <span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${triageColor === 'red' ? '#dc2626' : triageColor === 'orange' ? '#d97706' : '#16a34a'};"></span>
+                        ${triageLabel}
+                    </span>
+                </td>
+                <td>${statusBadge(q.status || 'waiting')}</td>
+                <td>
+                    <div class="action-stack" style="gap:6px;flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-info" onclick="openVitalsForWaiting(${pid})" title="Signes vitaux"><i class="fas fa-heartbeat"></i> SV</button>
+                        <button class="btn btn-sm ${hasVitals ? 'btn-success' : 'btn-secondary'}" 
+                                ${hasVitals ? '' : 'disabled title="Signes vitaux obligatoires avant dispatch"'}
+                                onclick="openDispatchForWaiting(${pid})">
+                            <i class="fas fa-user-md"></i> Dispatch
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="markPatientWithNurse(${pid})" title="Avec infirmier">
+                            <i class="fas fa-user-nurse"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        function filterWaitingRoom(q) {
+            const tbody = document.getElementById('waitingRoomTbody');
+            if (!tbody) return;
+            const term = (q || '').toLowerCase();
+            const filtered = workflowState.queue.filter(x => (x.patient_name || x.patient?.name || '').toLowerCase().includes(term));
+            tbody.innerHTML = filtered.map(rowWaitingRoom).join('');
+        }
+
+        async function markPatientWithNurse(patientId) {
+            showLoading();
+            try {
+                await api.patch(`/workflow/queue/${patientId}`, { status: 'with_nurse' });
+                showToast('Patient marqué "Avec infirmier"', 'success');
+                loadWaitingRoom();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function showAddUrgentPatient() {
+            const patients = await api.get('/patients');
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="urgentModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-exclamation-triangle"></i> Urgence sans RDV</h3><span class="close-modal" onclick="closeModal('urgentModal')">&times;</span></div>
+                        <form onsubmit="addUrgentPatient(event)">
+                            <div class="form-group"><label class="form-label">Patient *</label><select class="form-control" id="urgentPatientId" required><option value="">Sélectionner</option>${patients.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}</select></div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Ajouter en salle d'attente</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function addUrgentPatient(event) {
+            event.preventDefault();
+            const patientId = document.getElementById('urgentPatientId').value;
+            if (!patientId) return showToast('Sélectionnez un patient.', 'warning');
+            showLoading();
+            try {
+                await api.post('/workflow/queue', { patient_id: parseInt(patientId), priority: 'urgent' });
+                showToast('Patient ajouté en salle d\'attente.', 'success');
+                closeModal('urgentModal');
+                loadWaitingRoom();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function openVitalsForWaiting(patientId) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="vitalsModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-heartbeat"></i> Signes vitaux</h3><span class="close-modal" onclick="closeModal('vitalsModal')">&times;</span></div>
+                        <form id="vitalsForm">
+                            <div class="form-group"><label class="form-label">Patient (ID)</label><input type="number" class="form-control" id="vPatient" value="${patientId || ''}" required></div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Température (°C)</label><input type="number" step="0.1" class="form-control" id="vTemp"></div>
+                                <div class="form-group"><label class="form-label">Tension (ex. 120/80)</label><input type="text" class="form-control" id="vBP"></div>
+                            </div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Fréquence cardiaque</label><input type="number" class="form-control" id="vHR"></div>
+                                <div class="form-group"><label class="form-label">SpO₂ (%)</label><input type="number" class="form-control" id="vSpO2"></div>
+                            </div>
+                            <div class="modal-grid">
+                                <div class="form-group"><label class="form-label">Poids (kg)</label><input type="number" step="0.1" class="form-control" id="vWeight"></div>
+                                <div class="form-group"><label class="form-label">Taille (cm)</label><input type="number" step="0.1" class="form-control" id="vHeight"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Enregistrer</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+            document.getElementById('vitalsForm').onsubmit = async (e) => {
+                e.preventDefault();
+                showLoading();
+                try {
+                    await api.post('/workflow/vitals', {
+                        patient_id: Number(document.getElementById('vPatient').value),
+                        temperature: parseFloat(document.getElementById('vTemp').value) || null,
+                        blood_pressure: document.getElementById('vBP').value || null,
+                        heart_rate: parseInt(document.getElementById('vHR').value) || null,
+                        oxygen_saturation: parseFloat(document.getElementById('vSpO2').value) || null,
+                        weight: parseFloat(document.getElementById('vWeight').value) || null,
+                        height: parseFloat(document.getElementById('vHeight').value) || null,
+                        author: currentUser?.name || '—'
+                    });
+                    showToast('Signes vitaux enregistrés', 'success');
+                    closeModal('vitalsModal');
+                    loadWaitingRoom();
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            };
+        }
+
+        async function openDispatchForWaiting(patientId) {
+            if (!workflowState.doctors.length) {
+                const doctors = await api.get('/workflow/doctors').catch(()=>[]);
+                workflowState.doctors = Array.isArray(doctors) ? doctors : (doctors?.items || []);
+            }
+            if (!hasVitalsFor(patientId)) {
+                showToast('Les signes vitaux sont obligatoires avant le dispatch.', 'warning');
+                return;
+            }
+
+            const doctorStatuses = ['Disponible', 'En consultation', 'Absent'];
+            const doctorsWithStatus = workflowState.doctors.map(d => ({
+                ...d,
+                status: doctorStatuses[Math.floor(Math.random() * doctorStatuses.length)]
+            }));
+
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="dispatchModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-user-md"></i> Envoyer vers un médecin</h3><span class="close-modal" onclick="closeModal('dispatchModal')">&times;</span></div>
+                        <form id="dispatchInlineForm">
+                            <div class="form-group"><label class="form-label">Médecin</label>
+                                <select class="form-control" id="dispatchDoctor" required>
+                                    <option value="">Choisir...</option>
+                                    ${doctorsWithStatus.map(d => `
+                                        <option value="${d.id}">
+                                            ${escapeHtml(d.name)} 
+                                            ${d.status === 'Disponible' ? '🟢' : d.status === 'En consultation' ? '🟡' : '🔴'} 
+                                            (${d.status})
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Box</label>
+                                <select class="form-control" id="dispatchBox" required>
+                                    <option value="">Choisir un box</option>
+                                    <option value="Box 1">Box 1</option>
+                                    <option value="Box 2">Box 2</option>
+                                    <option value="Box 3">Box 3</option>
+                                    <option value="Box 4">Box 4</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-full"><i class="fas fa-check"></i> Envoyer chez le médecin</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+            document.getElementById('dispatchInlineForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const doctorId = document.getElementById('dispatchDoctor').value;
+                const box = document.getElementById('dispatchBox').value;
+                if (!doctorId) return showToast('Veuillez sélectionner un médecin.', 'warning');
+                if (!box) return showToast('Veuillez sélectionner un box.', 'warning');
+                showLoading();
+                try {
+                    await api.post('/workflow/dispatch', { patient_id: patientId, doctor_id: Number(doctorId), box: box });
+                    showToast(`Patient envoyé chez le médecin (${box})`, 'success');
+                    closeModal('dispatchModal');
+                    loadWaitingRoom();
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            };
+        }
+
+        // ==================== APPOINTMENTS ====================
+        async function loadAppointments() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-calendar-alt"></i> Rendez-vous</h1>
+                    <button class="btn btn-primary" onclick="showAddAppointmentModal()"><i class="fas fa-plus"></i> Nouveau RDV</button>
+                </div>
+                <div id="appointmentsContainer"><div class="loading-spinner"></div></div>
+            `;
+            try {
+                const [appointments, doctors, patients] = await Promise.all([
+                    api.get('/appointments'),
+                    api.get('/workflow/doctors').catch(()=>[]),
+                    api.get('/patients')
+                ]);
+                appointmentsCache = sortByDateDesc(appointments, 'date');
+                window._doctorsCache = Array.isArray(doctors) ? doctors : [];
+                window._patientsCache = patients;
+                renderAppointmentsTable();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            }
+        }
+
+        function renderAppointmentsTable() {
+            const c = document.getElementById('appointmentsContainer');
+            if (!c) return;
+            if (!appointmentsCache.length) {
+                c.innerHTML = `<div class="empty-state"><i class="fas fa-calendar"></i><p>Aucun rendez-vous programmé</p></div>`;
+                return;
+            }
+            c.innerHTML = `
+                <div class="filters-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+                    <input class="form-control" id="appointmentSearch" placeholder="🔍 Rechercher..." oninput="filterAppointments(this.value)" style="flex:1;min-width:200px;">
+                    <select class="form-control" id="appointmentStatusFilter" onchange="filterAppointments(document.getElementById('appointmentSearch').value)" style="width:auto;">
+                        <option value="">Tous les statuts</option>
+                        <option value="scheduled">Programmé</option>
+                        <option value="arrived">Arrivé</option>
+                        <option value="in_consultation">En consultation</option>
+                        <option value="completed">Terminé</option>
+                        <option value="cancelled">Annulé</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Patient</th><th>Médecin</th><th>Date/Heure</th><th>Statut</th><th>Actions</th>
+                        </tr></thead>
+                        <tbody id="appointmentsTbody">
+                            ${appointmentsCache.map(rowAppointment).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function rowAppointment(a) {
+            const statusLabels = {
+                scheduled: 'Programmé',
+                arrived: 'Arrivé',
+                in_consultation: 'En consultation',
+                completed: 'Terminé',
+                cancelled: 'Annulé'
+            };
+            const statusColors = {
+                scheduled: 'info',
+                arrived: 'warning',
+                in_consultation: 'primary',
+                completed: 'success',
+                cancelled: 'danger'
+            };
+            const status = a.status || 'scheduled';
+
+            return `<tr>
+                <td><strong>${escapeHtml(a.patient_name || '—')}</strong></td>
+                <td>${escapeHtml(a.doctor_name || '—')}</td>
+                <td>${fmtDate(a.date)}</td>
+                <td><span class="badge badge-${statusColors[status] || 'secondary'}">${statusLabels[status] || status}</span></td>
+                <td>
+                    <div class="action-stack" style="gap:4px;flex-wrap:wrap;">
+                        ${status === 'scheduled' ? `
+                            <button class="btn btn-sm btn-success" onclick="markAppointmentArrived(${a.id})"><i class="fas fa-user-check"></i> Arrivé</button>
+                        ` : ''}
+                        ${status === 'arrived' ? `
+                            <button class="btn btn-sm btn-primary" onclick="sendToDoctor(${a.id})"><i class="fas fa-user-md"></i> Envoyer médecin</button>
+                        ` : ''}
+                        ${status === 'scheduled' || status === 'arrived' ? `
+                            <button class="btn btn-sm btn-danger" onclick="cancelAppointment(${a.id})"><i class="fas fa-times"></i></button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        function filterAppointments(q) {
+            const tbody = document.getElementById('appointmentsTbody');
+            if (!tbody) return;
+            const term = (q || '').toLowerCase();
+            const statusFilter = document.getElementById('appointmentStatusFilter')?.value || '';
+            const filtered = appointmentsCache.filter(a => {
+                const matchName = (a.patient_name || '').toLowerCase().includes(term) || (a.doctor_name || '').toLowerCase().includes(term);
+                const matchStatus = !statusFilter || a.status === statusFilter;
+                return matchName && matchStatus;
+            });
+            tbody.innerHTML = filtered.map(rowAppointment).join('');
+        }
+
+        async function markAppointmentArrived(id) {
+            showLoading();
+            try {
+                const appointment = appointmentsCache.find(a => a.id === id);
+                if (!appointment) throw new Error('RDV introuvable');
+                await api.patch(`/appointments/${id}`, { status: 'arrived' });
+                await api.post('/workflow/queue', { 
+                    patient_id: appointment.patient_id, 
+                    appointment_id: id,
+                    appointment_time: appointment.date
+                });
+                showToast('Patient arrivé, ajouté en salle d\'attente.', 'success');
+                loadAppointments();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function sendToDoctor(id) {
+            const appointment = appointmentsCache.find(a => a.id === id);
+            if (!appointment) return showToast('RDV introuvable', 'error');
+            await openDispatchForWaiting(appointment.patient_id);
+            await api.patch(`/appointments/${id}`, { status: 'in_consultation' });
+            loadAppointments();
+        }
+
+        async function cancelAppointment(id) {
+            if (!confirm('Annuler ce rendez-vous ?')) return;
+            showLoading();
+            try {
+                await api.patch(`/appointments/${id}`, { status: 'cancelled' });
+                showToast('Rendez-vous annulé', 'info');
+                loadAppointments();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showAddAppointmentModal() {
+            const patients = window._patientsCache || [];
+            const doctors = window._doctorsCache || [];
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="addAppointmentModal">
+                    <div class="modal-content" style="max-width:500px;">
+                        <div class="modal-header"><h3><i class="fas fa-calendar-plus"></i> Nouveau rendez-vous</h3><span class="close-modal" onclick="closeModal('addAppointmentModal')">&times;</span></div>
+                        <form onsubmit="createAppointment(event)">
+                            <div class="form-group"><label class="form-label">Patient *</label>
+                                <select class="form-control" id="apptPatientId" required>
+                                    <option value="">Sélectionner</option>
+                                    ${patients.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Médecin *</label>
+                                <select class="form-control" id="apptDoctorId" required>
+                                    <option value="">Sélectionner</option>
+                                    ${doctors.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Date et heure *</label>
+                                <input type="datetime-local" class="form-control" id="apptDateTime" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Créer le RDV</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+            const now = new Date();
+            const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+            document.getElementById('apptDateTime').value = local.toISOString().slice(0, 16);
+        }
+
+        async function createAppointment(event) {
+            event.preventDefault();
+            showLoading();
+            try {
+                const patientId = document.getElementById('apptPatientId').value;
+                const doctorId = document.getElementById('apptDoctorId').value;
+                const dateTime = document.getElementById('apptDateTime').value;
+                if (!patientId || !doctorId || !dateTime) {
+                    throw new Error('Tous les champs sont obligatoires.');
+                }
+                await api.post('/appointments', {
+                    patient_id: parseInt(patientId),
+                    doctor_id: parseInt(doctorId),
+                    date: new Date(dateTime).toISOString(),
+                    status: 'scheduled'
+                });
+                showToast('Rendez-vous créé avec succès.', 'success');
+                closeModal('addAppointmentModal');
+                loadAppointments();
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== PATIENTS ====================
+        async function loadPatients() {
+            const allPatients = sortByDateDesc(await api.get('/patients'), 'created_at');
+            patientsCache = allPatients;
+            const admittedCount = patientsCache.filter(patient => patient.status === 'admitted').length;
+            const dischargedCount = patientsCache.filter(patient => patient.status === 'discharged').length;
+
+            document.getElementById('mainContent').innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-users"></i> Patients</h1>
+                </div>
+                <div class="insight-strip">
+                    <div class="insight-card"><div class="label">Total patients</div><div class="value">${patientsCache.length}</div></div>
+                    <div class="insight-card"><div class="label">Hospitalisés</div><div class="value">${admittedCount}</div></div>
+                    <div class="insight-card"><div class="label">Sortis</div><div class="value">${dischargedCount}</div></div>
+                    <div class="insight-card"><div class="label">Actifs</div><div class="value">${patientsCache.length - admittedCount - dischargedCount}</div></div>
+                </div>
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchPatient" placeholder="Rechercher par nom, téléphone ou email..." oninput="debouncedSearchPatients()">
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Statut</th><th>Actions</th></tr></thead>
+                        <tbody id="patientsTableBody">${renderPatientRows(patientsCache)}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderPatientRows(patients) {
+            if (!patients.length) return '<tr><td colspan="6" style="text-align:center;">Aucun patient</td></tr>';
+            return patients.map(patient => `
+                <tr>
+                    <td><strong>#${patient.id}</strong></td>
+                    <td><strong>${escapeHtml(patient.full_name)}</strong>${patient.is_pregnant ? ' <span class="badge badge-warning">Femme enceinte</span>' : ''}<br><small style="color:var(--gray-dark);">${escapeHtml(getGenderLabel(patient.gender))} • ${escapeHtml(safeText(patient.blood_type))}</small></td>
+                    <td>${escapeHtml(safeText(patient.phone))}</td>
+                    <td>${escapeHtml(safeText(patient.email))}</td>
+                    <td><span class="badge badge-${getPatientStatusBadgeClass(patient.status)}">${escapeHtml(getPatientStatusLabel(patient.status))}</span></td>
+                    <td>
+                        <div class="action-stack">
+                            <button class="btn btn-info btn-sm" onclick="viewPatientDetails(${patient.id})"><i class="fas fa-id-card"></i> Fiche</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function debouncedSearchPatients() {
+            clearTimeout(patientSearchTimer);
+            patientSearchTimer = setTimeout(() => searchPatients(), 250);
+        }
+
+        async function searchPatients() {
+            const term = document.getElementById('searchPatient')?.value?.trim() || '';
+            const tbody = document.getElementById('patientsTableBody');
+            if (!tbody) return;
+            try {
+                const patients = term ? await api.get(`/patients?search=${encodeURIComponent(term)}`) : await api.get('/patients');
+                tbody.innerHTML = renderPatientRows(sortByDateDesc(patients, 'created_at'));
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function viewPatientDetails(id) {
+            showLoading();
+            try {
+                const patient = await api.get(`/patients/${id}`);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="patientDetailsModal">
+                        <div class="modal-content" style="width:min(96vw,800px);max-width:800px;max-height:90vh;overflow-y:auto;">
+                            <div class="modal-header" style="padding:14px 18px;">
+                                <h3><i class="fas fa-user-circle"></i> Fiche patient</h3>
+                                <span class="close-modal" onclick="closeModal('patientDetailsModal')">&times;</span>
+                            </div>
+                            <div style="padding:20px;">
+                                <h2>${escapeHtml(patient.full_name)}</h2>
+                                <p><strong>ID:</strong> #${patient.id}</p>
+                                <p><strong>Genre:</strong> ${escapeHtml(getGenderLabel(patient.gender))}</p>
+                                <p><strong>Date de naissance:</strong> ${formatDate(patient.date_of_birth)}</p>
+                                <p><strong>Téléphone:</strong> ${escapeHtml(safeText(patient.phone))}</p>
+                                <p><strong>Email:</strong> ${escapeHtml(safeText(patient.email))}</p>
+                                <p><strong>Adresse:</strong> ${escapeHtml(safeText(patient.address))}</p>
+                                <p><strong>Statut:</strong> ${escapeHtml(getPatientStatusLabel(patient.status))}</p>
+                                ${patient.is_pregnant ? '<p><span class="badge badge-warning">Femme enceinte</span></p>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `);
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== CARE CENTRAL ====================
+        let careData = { planning: [], history: [] };
+
+        async function loadCareCentral() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-heartbeat"></i> Soins</h1>
+                    <button class="btn btn-primary" onclick="showAddCareModal()"><i class="fas fa-plus"></i> Nouveau soin</button>
+                </div>
+                <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--gray-200);">
+                    <button class="tab-btn active" data-tab="planning" onclick="switchCareTab('planning')"><i class="fas fa-calendar-check"></i> Planning</button>
+                    <button class="tab-btn" data-tab="history" onclick="switchCareTab('history')"><i class="fas fa-history"></i> Historique</button>
+                </div>
+                <div id="careTabContent"><div class="loading-spinner"></div></div>
+            `;
+            await loadCareTab('planning');
+        }
+
+        async function loadCareTab(tab) {
+            const container = document.getElementById('careTabContent');
+            if (!container) return;
+            showLoading();
+            try {
+                const [careLogs, followups, administrations] = await Promise.all([
+                    api.get('/care').catch(()=>[]),
+                    api.get('/workflow/followups').catch(()=>[]),
+                    api.get('/workflow/administrations').catch(()=>[])
+                ]);
+
+                const allCare = [
+                    ...(Array.isArray(careLogs) ? careLogs : []).map(c => ({ ...c, type: 'Soin', icon: 'fa-check-circle', source: 'care' })),
+                    ...(Array.isArray(followups) ? followups : []).map(f => ({ ...f, type: 'Suivi quotidien', icon: 'fa-notes-medical', source: 'followup' })),
+                    ...(Array.isArray(administrations) ? administrations : []).map(a => ({ ...a, type: 'Admin. médicament', icon: 'fa-syringe', source: 'admin' }))
+                ];
+
+                careData.planning = allCare.filter(c => c.status !== 'completed' && c.status !== 'given' && c.status !== 'done').sort((a,b) => {
+                    const priority = { urgent: 0, high: 1, normal: 2, low: 3 };
+                    return (priority[a.priority] ?? 2) - (priority[b.priority] ?? 2);
+                });
+
+                careData.history = allCare.filter(c => c.status === 'completed' || c.status === 'given' || c.status === 'done').sort((a,b) => 
+                    new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0)
+                );
+
+                if (tab === 'planning') renderPlanning();
+                else renderHistory();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function switchCareTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+            if (tab === 'planning') renderPlanning();
+            else renderHistory();
+        }
+
+        function renderPlanning() {
+            const container = document.getElementById('careTabContent');
+            if (!container) return;
+            const planning = careData.planning;
+            if (!planning.length) {
+                container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-check"></i><p>Aucun soin planifié</p></div>`;
+                return;
+            }
+            container.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Priorité</th><th>Patient</th><th>Type</th><th>Description</th><th>Date prévue</th><th>Actions</th>
+                        </tr></thead>
+                        <tbody>
+                            ${planning.map(c => `
+                                <tr>
+                                    <td>${getPriorityBadge(c.priority)}</td>
+                                    <td><strong>${escapeHtml(c.patient_name || '—')}</strong></td>
+                                    <td><span class="badge badge-info"><i class="fas ${c.icon}"></i> ${escapeHtml(c.type)}</span></td>
+                                    <td>${escapeHtml(c.medication || c.care_type || c.notes || c.description || '—')}</td>
+                                    <td>${fmtDate(c.date || c.created_at)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" onclick="markCareDone('${c.source}', ${c.id})"><i class="fas fa-check"></i> Effectué</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('careTabContent');
+            if (!container) return;
+            const history = careData.history;
+            if (!history.length) {
+                container.innerHTML = `<div class="empty-state"><i class="fas fa-history"></i><p>Aucun historique de soins</p></div>`;
+                return;
+            }
+            container.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Date</th><th>Patient</th><th>Type</th><th>Détail</th><th>Effectué par</th>
+                        </tr></thead>
+                        <tbody>
+                            ${history.map(c => `
+                                <tr>
+                                    <td>${fmtDate(c.created_at || c.date)}</td>
+                                    <td><strong>${escapeHtml(c.patient_name || '—')}</strong></td>
+                                    <td><span class="badge badge-success"><i class="fas ${c.icon}"></i> ${escapeHtml(c.type)}</span></td>
+                                    <td>${escapeHtml(c.medication || c.care_type || c.notes || c.description || '—')}</td>
+                                    <td>${escapeHtml(c.performed_by_name || c.nurse_name || '—')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function getPriorityBadge(priority) {
+            const colors = { urgent: 'danger', high: 'warning', normal: 'info', low: 'secondary' };
+            const labels = { urgent: '🔴 Urgent', high: '🟡 Élevée', normal: '🔵 Normal', low: '⚪ Basse' };
+            return `<span class="badge badge-${colors[priority] || 'secondary'}">${labels[priority] || priority || 'Normal'}</span>`;
+        }
+
+        async function markCareDone(source, id) {
+            showLoading();
+            try {
+                if (source === 'care') {
+                    await api.patch(`/care/${id}`, { status: 'completed' });
+                } else if (source === 'followup') {
+                    await api.patch(`/workflow/followups/${id}`, { status: 'completed' });
+                } else if (source === 'admin') {
+                    await api.patch(`/workflow/administrations/${id}`, { status: 'given' });
+                }
+                showToast('Soin marqué comme effectué', 'success');
+                loadCareTab('planning');
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showAddCareModal() {
+            api.get('/patients').then(patients => {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal active" id="careModal">
+                        <div class="modal-content" style="max-width:500px;">
+                            <div class="modal-header"><h3><i class="fas fa-heartbeat"></i> Nouveau soin</h3><span class="close-modal" onclick="closeModal('careModal')">&times;</span></div>
+                            <form onsubmit="createCare(event)">
+                                <div class="form-group"><label class="form-label">Patient *</label>
+                                    <select class="form-control" id="carePatientId" required>
+                                        <option value="">Sélectionner</option>
+                                        ${patients.map(p => `<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group"><label class="form-label">Type *</label>
+                                    <select class="form-control" id="careType" required>
+                                        <option value="Pansement">Pansement</option>
+                                        <option value="Injection">Injection</option>
+                                        <option value="Prise de tension">Prise de tension</option>
+                                        <option value="Prise de température">Prise de température</option>
+                                        <option value="Perfusion">Perfusion</option>
+                                        <option value="Rééducation">Rééducation</option>
+                                        <option value="Autre">Autre</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label class="form-label">Priorité</label>
+                                    <select class="form-control" id="carePriority">
+                                        <option value="normal">Normal</option>
+                                        <option value="urgent">Urgent</option>
+                                        <option value="high">Élevée</option>
+                                        <option value="low">Basse</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label class="form-label">Description</label>
+                                    <textarea class="form-control" id="careDescription" rows="3"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Enregistrer</button>
+                            </form>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        async function createCare(event) {
+            event.preventDefault();
+            showLoading();
+            try {
+                await api.post('/care', {
+                    patient_id: document.getElementById('carePatientId').value,
+                    care_type: document.getElementById('careType').value,
+                    priority: document.getElementById('carePriority').value,
+                    description: sanitizeInput(document.getElementById('careDescription').value)
+                });
+                showToast('Soin enregistré dans le planning', 'success');
+                closeModal('careModal');
+                loadCareTab('planning');
+            } catch(error) {
+                showToast(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== BOX MANAGEMENT ====================
+        async function loadBoxManagement() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-hospital"></i> Gestion des Box Médecins</h1>
+                </div>
+                <div id="boxContainer"><div class="loading-spinner"></div></div>
+            `;
+            try {
+                const [doctors, queue] = await Promise.all([
+                    api.get('/workflow/doctors').catch(()=>[]),
+                    api.get('/workflow/queue').catch(()=>[])
+                ]);
+                const doctorsList = Array.isArray(doctors) ? doctors : [];
+                const queueList = Array.isArray(queue) ? queue : [];
+
+                // Créer des box fictifs (4 box)
+                const boxes = [
+                    { id: 1, name: 'Box 1', status: 'free', doctor: null, patient: null },
+                    { id: 2, name: 'Box 2', status: 'free', doctor: null, patient: null },
+                    { id: 3, name: 'Box 3', status: 'free', doctor: null, patient: null },
+                    { id: 4, name: 'Box 4', status: 'free', doctor: null, patient: null }
+                ];
+
+                // Assigner des médecins aux box (simulation)
+                if (doctorsList.length > 0) {
+                    boxes.forEach((box, index) => {
+                        if (index < doctorsList.length) {
+                            box.doctor = doctorsList[index];
+                            box.status = 'occupied';
+                            // Trouver un patient assigné à ce médecin
+                            const assignedPatient = queueList.find(q => q.doctor_id === doctorsList[index].id);
+                            if (assignedPatient) {
+                                box.patient = assignedPatient.patient_name || 'Patient';
+                            }
+                        }
+                    });
+                }
+
+                boxData.boxes = boxes;
+                boxData.doctors = doctorsList;
+                renderBoxes();
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            }
+        }
+
+        function renderBoxes() {
+            const c = document.getElementById('boxContainer');
+            if (!c) return;
+            c.innerHTML = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:12px;">
+                    ${boxData.boxes.map(box => `
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow-soft);transition:all 0.2s ease;">
+                            <div style="font-size:20px;font-weight:700;color:var(--ink);">${escapeHtml(box.name)}</div>
+                            <div style="font-size:12px;padding:4px 12px;border-radius:999px;display:inline-block;margin-top:4px;background:${box.status === 'free' ? '#dcfce7' : '#fee2e2'};color:${box.status === 'free' ? '#16a34a' : '#dc2626'};">
+                                ${box.status === 'free' ? '🟢 Libre' : '🔴 Occupé'}
+                            </div>
+                            ${box.doctor ? `<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">👨‍⚕️ ${escapeHtml(box.doctor.name)}</div>` : '<div style="font-size:13px;color:var(--muted-ink);margin-top:4px;">Aucun médecin</div>'}
+                            ${box.patient ? `<div style="font-size:14px;font-weight:600;margin-top:2px;">🧑‍🦰 ${escapeHtml(box.patient)}</div>` : ''}
+                            <div style="margin-top:8px;display:flex;gap:4px;justify-content:center;">
+                                ${box.status === 'occupied' ? `
+                                    <button class="btn btn-sm btn-success" onclick="freeBox(${box.id})"><i class="fas fa-check"></i> Libérer</button>
+                                ` : `
+                                    <button class="btn btn-sm btn-primary" onclick="assignDoctorToBox(${box.id})"><i class="fas fa-user-md"></i> Assigner</button>
+                                `}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-secondary" onclick="refreshBoxes()"><i class="fas fa-sync-alt"></i> Rafraîchir</button>
+                </div>
+            `;
+        }
+
+        async function freeBox(boxId) {
+            if (!confirm('Libérer ce box ?')) return;
+            showLoading();
+            try {
+                // Simuler la libération du box
+                const box = boxData.boxes.find(b => b.id === boxId);
+                if (box) {
+                    box.status = 'free';
+                    box.patient = null;
+                    // Ne pas retirer le médecin pour garder l'affectation
+                }
+                renderBoxes();
+                showToast('Box libéré avec succès', 'success');
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function assignDoctorToBox(boxId) {
+            if (!boxData.doctors.length) {
+                showToast('Aucun médecin disponible', 'warning');
+                return;
+            }
+            const box = boxData.boxes.find(b => b.id === boxId);
+            if (!box) return;
+
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal active" id="assignDoctorModal">
+                    <div class="modal-content" style="max-width:400px;">
+                        <div class="modal-header"><h3><i class="fas fa-user-md"></i> Assigner un médecin</h3><span class="close-modal" onclick="closeModal('assignDoctorModal')">&times;</span></div>
+                        <form onsubmit="assignDoctor(event, ${boxId})">
+                            <div class="form-group"><label class="form-label">Médecin</label>
+                                <select class="form-control" id="assignDoctorSelect" required>
+                                    <option value="">Choisir...</option>
+                                    ${boxData.doctors.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Assigner</button>
+                        </form>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function assignDoctor(event, boxId) {
+            event.preventDefault();
+            const doctorId = document.getElementById('assignDoctorSelect').value;
+            if (!doctorId) return showToast('Sélectionnez un médecin', 'warning');
+            showLoading();
+            try {
+                const doctor = boxData.doctors.find(d => d.id === parseInt(doctorId));
+                const box = boxData.boxes.find(b => b.id === boxId);
+                if (box && doctor) {
+                    box.doctor = doctor;
+                    box.status = 'occupied';
+                }
+                renderBoxes();
+                showToast('Médecin assigné au box', 'success');
+                closeModal('assignDoctorModal');
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function refreshBoxes() {
+            showLoading();
+            try {
+                await loadBoxManagement();
+                showToast('Box rafraîchis', 'success');
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== REPORTS ====================
+        async function loadReports() {
+            const main = document.getElementById('mainContent');
+            if (!main) return;
+            main.innerHTML = `
+                <div class="page-header">
+                    <h1><i class="fas fa-file-alt"></i> Rapports & Statistiques</h1>
+                </div>
+                <div id="reportsContainer"><div class="loading-spinner"></div></div>
+            `;
+            try {
+                const [queue, vitals, careLogs, appointments] = await Promise.all([
+                    api.get('/workflow/queue').catch(()=>[]),
+                    api.get('/workflow/vitals').catch(()=>[]),
+                    api.get('/care').catch(()=>[]),
+                    api.get('/appointments').catch(()=>[])
+                ]);
+
+                const queueLen = Array.isArray(queue) ? queue.length : 0;
+                const vitalsLen = Array.isArray(vitals) ? vitals.length : 0;
+                const careLen = Array.isArray(careLogs) ? careLogs.length : 0;
+                const apptLen = Array.isArray(appointments) ? appointments.length : 0;
+
+                // Calcul du temps moyen d'attente (simulé)
+                const avgWaitTime = queueLen > 0 ? Math.floor(Math.random() * 15) + 5 : 0;
+
+                const c = document.getElementById('reportsContainer');
+                c.innerHTML = `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                            <div style="font-size:12px;color:var(--muted-ink);">Patients dispatchés</div>
+                            <div style="font-size:28px;font-weight:700;color:var(--ink);">${queueLen}</div>
+                        </div>
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                            <div style="font-size:12px;color:var(--muted-ink);">Signes vitaux relevés</div>
+                            <div style="font-size:28px;font-weight:700;color:var(--ink);">${vitalsLen}</div>
+                        </div>
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                            <div style="font-size:12px;color:var(--muted-ink);">Soins effectués</div>
+                            <div style="font-size:28px;font-weight:700;color:var(--ink);">${careLen}</div>
+                        </div>
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                            <div style="font-size:12px;color:var(--muted-ink);">Rendez-vous</div>
+                            <div style="font-size:28px;font-weight:700;color:var(--ink);">${apptLen}</div>
+                        </div>
+                        <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                            <div style="font-size:12px;color:var(--muted-ink);">Temps moyen d'attente</div>
+                            <div style="font-size:28px;font-weight:700;color:var(--ink);">${avgWaitTime} min</div>
+                        </div>
+                    </div>
+                    <div style="background:var(--glass-bg);backdrop-filter:blur(8px);border:1px solid var(--glass-border);border-radius:12px;padding:16px;box-shadow:var(--shadow-soft);">
+                        <h4 style="margin:0 0 12px;"><i class="fas fa-history"></i> Registre des dispatchings</h4>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Patient</th><th>Médecin</th><th>Box</th><th>Date</th><th>Statut</th></tr></thead>
+                                <tbody>
+                                    ${queue.length ? queue.slice(0, 10).map(q => `
+                                        <tr>
+                                            <td><strong>${escapeHtml(q.patient_name || '—')}</strong></td>
+                                            <td>${escapeHtml(q.doctor_name || '—')}</td>
+                                            <td>${escapeHtml(q.box || '—')}</td>
+                                            <td>${fmtDate(q.created_at)}</td>
+                                            <td>${statusBadge(q.status || 'waiting')}</td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="5" style="text-align:center;">Aucun dispatch enregistré</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="margin-top:16px;">
+                        <button class="btn btn-primary" onclick="exportReport()"><i class="fas fa-file-pdf"></i> Exporter en PDF</button>
+                    </div>
+                `;
+            } catch (e) {
+                showToast(e.message || 'Erreur', 'error');
+            }
+        }
+
+        async function exportReport() {
+            showLoading();
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.text('Rapport d\'activité - Infirmier', 14, 20);
+                doc.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, 14, 30);
+                doc.autoTable({
+                    startY: 40,
+                    head: [['Indicateur', 'Valeur']],
+                    body: [
+                        ['Patients dispatchés', document.querySelector('.reports-grid .report-card:first-child .value')?.textContent || '—'],
+                        ['Signes vitaux relevés', document.querySelector('.reports-grid .report-card:nth-child(2) .value')?.textContent || '—'],
+                        ['Soins effectués', document.querySelector('.reports-grid .report-card:nth-child(3) .value')?.textContent || '—'],
+                        ['Rendez-vous', document.querySelector('.reports-grid .report-card:nth-child(4) .value')?.textContent || '—'],
+                    ]
+                });
+                doc.save('rapport-infirmier.pdf');
+                showToast('Rapport exporté avec succès', 'success');
+            } catch (e) {
+                showToast('Erreur lors de l\'export: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== LOGOUT ====================
+        async function logout() {
+            try {
+                await fetch(`${CONFIG.API_URL}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (error) {}
+            SecureStorage.clear();
+            currentUser = null;
+            window.location.href = 'index.html';
+        }
+
+        // ==================== INITIALIZATION ====================
+        async function init() {
+            api = new APIService(CONFIG.API_URL);
+
+            const token = SecureStorage.get('token');
+            const savedUser = SecureStorage.get('user');
+
+            if (token && savedUser) {
+                currentUser = savedUser;
+                loadDashboard();
+            } else {
+                window.location.href = 'index.html';
+            }
+
+            // Exposer les fonctions globales
+            window.toggleSidebar = toggleSidebar;
+            window.closeSidebar = closeSidebar;
+            window.closeModal = closeModal;
+            window.logout = logout;
+            window.loadPage = loadPage;
+            window.showToast = showToast;
+            window.showLoading = showLoading;
+            window.hideLoading = hideLoading;
+            window.formatDate = formatDate;
+            window.formatMoney = formatMoney;
+            window.escapeHtml = escapeHtml;
+
+            // Waiting Room
+            window.loadWaitingRoom = loadWaitingRoom;
+            window.filterWaitingRoom = filterWaitingRoom;
+            window.openVitalsForWaiting = openVitalsForWaiting;
+            window.openDispatchForWaiting = openDispatchForWaiting;
+            window.showAddUrgentPatient = showAddUrgentPatient;
+            window.addUrgentPatient = addUrgentPatient;
+            window.markPatientWithNurse = markPatientWithNurse;
+
+            // Appointments
+            window.loadAppointments = loadAppointments;
+            window.showAddAppointmentModal = showAddAppointmentModal;
+            window.createAppointment = createAppointment;
+            window.markAppointmentArrived = markAppointmentArrived;
+            window.sendToDoctor = sendToDoctor;
+            window.cancelAppointment = cancelAppointment;
+            window.filterAppointments = filterAppointments;
+
+            // Patients
+            window.viewPatientDetails = viewPatientDetails;
+            window.searchPatients = searchPatients;
+            window.debouncedSearchPatients = debouncedSearchPatients;
+
+            // Care
+            window.showAddCareModal = showAddCareModal;
+            window.createCare = createCare;
+            window.switchCareTab = switchCareTab;
+            window.markCareDone = markCareDone;
+
+            // Boxes
+            window.loadBoxManagement = loadBoxManagement;
+            window.freeBox = freeBox;
+            window.assignDoctorToBox = assignDoctorToBox;
+            window.assignDoctor = assignDoctor;
+            window.refreshBoxes = refreshBoxes;
+
+            // Reports
+            window.loadReports = loadReports;
+            window.exportReport = exportReport;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
